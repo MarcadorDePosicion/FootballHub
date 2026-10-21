@@ -8,6 +8,10 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -19,6 +23,7 @@ import pl.stasgroch.footballhub.ui.theme.hubHeaderGradient
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable fun FootballApp(vm: FootballViewModel = viewModel()) {
+    val focusManager = LocalFocusManager.current
     val state by vm.state.collectAsStateWithLifecycle()
     val entries by vm.entries.collectAsStateWithLifecycle()
     val favorites by vm.favorites.collectAsStateWithLifecycle()
@@ -50,8 +55,8 @@ import pl.stasgroch.footballhub.ui.theme.hubHeaderGradient
                 }
             } else {
             TopAppBar(title = {
-                HeaderSearch(matchFilters.query, { matchFilters.query = it }) {
-                    nav.navigate("matches") { popUpTo("home"); launchSingleTop = true }
+                HeaderSearch(state.data.teams) { teamId ->
+                    nav.navigate("team/$teamId")
                 }            }, navigationIcon = {
                 if (route !in tabs.map { it.first }) IconButton({ nav.popBackStack() }) { Icon(HubIcons.Back, "Wstecz") }
             }, actions = {
@@ -61,7 +66,14 @@ import pl.stasgroch.footballhub.ui.theme.hubHeaderGradient
             }, colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background))
         } } },
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding()) {
+        Column(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding().pointerInput(focusManager, route) {
+            awaitPointerEventScope {
+                while (true) {
+                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                    if (event.type == PointerEventType.Press && tabs.any { it.first == route }) focusManager.clearFocus()
+                }
+            }
+        }) {
             if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
             state.error?.let { message ->
                 Surface(color = MaterialTheme.colorScheme.errorContainer, shape = MaterialTheme.shapes.medium, modifier = Modifier.padding(HubSpace.md)) {
@@ -123,6 +135,8 @@ import pl.stasgroch.footballhub.ui.theme.hubHeaderGradient
         }
     }
 }
+
+
 
 
 

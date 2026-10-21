@@ -37,7 +37,7 @@ class FootballUiTest {
     private fun entryAction(text: String, action: String) {
         val id = runBlocking { FootballDatabase.get(rule.activity).userDao().entries().first().single { it.text == text }.id }
         rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-$id"))
-        rule.onNode(hasText(action) and hasAnyAncestor(hasTestTag("entry-$id"))).performClick()
+        rule.onNode(hasContentDescription(action) and hasAnyAncestor(hasTestTag("entry-$id"))).performClick()
     }
     private fun screenshot(name: String) {
         rule.waitForIdle()
@@ -54,6 +54,24 @@ class FootballUiTest {
         val target = hasText(text) and hasSetTextAction().not()
         rule.onNode(hasScrollToIndexAction()).performScrollToNode(target)
         rule.onNode(target).performClick()
+    }
+
+    @Test fun teamSearchSuggestionsDismissAndProfile() {
+        waitFor("Mecze dnia")
+        val search = rule.onNodeWithTag("team-search")
+        search.performClick().performTextInput("at")
+        rule.onNodeWithTag("search-team-7").assertExists()
+        rule.onNodeWithTag("search-team-8").assertExists()
+        search.performTextReplacement("ath")
+        rule.onNodeWithTag("search-team-7").assertDoesNotExist()
+        rule.onNodeWithTag("search-team-8").assertExists()
+        rule.onNode(isRoot() and hasAnyDescendant(hasTestTag("team-search"))).performTouchInput { click(androidx.compose.ui.geometry.Offset(8f, height * .6f)) }
+        rule.onNodeWithTag("team-search-results").assertDoesNotExist()
+        search.assertIsNotFocused().assert(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.EditableText, androidx.compose.ui.text.AnnotatedString("")))
+        search.performClick().performTextInput("barcelona")
+        rule.onNodeWithTag("search-team-5").performClick()
+        rule.onNodeWithTag("team-tab-0").assertIsDisplayed()
+        rule.onAllNodesWithText("FC Barcelona").onFirst().assertExists()
     }
 
     @Test fun matchDatesAndChronologicalOrder() {
@@ -87,7 +105,6 @@ class FootballUiTest {
     @Test fun compactMatchActionsTeamLinksAndHighlightedTable() {
         waitFor("Mecze dnia")
         click("Mecze")
-        rule.onNode(hasSetTextAction()).performTextInput("Liverpool")
         androidx.test.espresso.Espresso.closeSoftKeyboard()
         scrollClick("Liverpool")
         waitFor("Szczegóły meczu")
@@ -237,13 +254,6 @@ class FootballUiTest {
         waitFor("Mecze dnia")
         screenshot("home")
         click("Mecze")
-        rule.onNode(hasSetTextAction()).performTextInput("zzzz")
-        rule.onNodeWithText("Brak meczów dla wybranych filtrów.").assertIsDisplayed()
-        rule.onNode(hasSetTextAction()).performTextReplacement("Liverpool")
-        androidx.test.espresso.Espresso.closeSoftKeyboard()
-        click("Ligi")
-        click("Mecze")
-        rule.onNode(hasSetTextAction()).assertTextContains("Liverpool")
         scrollClick("Liverpool")
         waitFor("Szczegóły meczu")
         screenshot("match")
@@ -276,6 +286,9 @@ class FootballUiTest {
         waitFor("3 : 1")
         rule.activityRule.scenario.recreate()
         waitFor("3 : 1")
+        click("Wszystkie")
+        rule.onAllNodesWithTag("journal-match-1").assertCountEquals(1)
+        screenshot("journal-grouped")
         entryAction("Test UI: typ", "Usuń")
         click("Usuń wpis")
         rule.onNodeWithText("Test UI: typ").assertDoesNotExist()
@@ -293,6 +306,7 @@ class FootballUiTest {
         waitFor("Usuń z ulubionych")
         click("Ulubione")
         waitFor("Arsenal")
+        screenshot("favorites-stars")
         rule.activityRule.scenario.recreate()
         waitFor("Arsenal")
         click("Arsenal")
@@ -302,6 +316,10 @@ class FootballUiTest {
         waitFor("Mecze dnia")
     }
 }
+
+
+
+
 
 
 

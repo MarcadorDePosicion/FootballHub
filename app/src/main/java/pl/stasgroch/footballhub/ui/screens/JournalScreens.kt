@@ -22,17 +22,18 @@ import pl.stasgroch.footballhub.data.model.*
 @Composable fun EntryCard(entry: JournalEntry, edit: () -> Unit, delete: () -> Unit) {
     var confirm by remember { mutableStateOf(false) }
     Card(Modifier.fillMaxWidth().testTag("entry-${entry.id}"), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-        Column(Modifier.padding(HubSpace.md), verticalArrangement = Arrangement.spacedBy(HubSpace.sm)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(HubSpace.sm)) {
-                Icon(if (entry.kind == "NOTE") HubIcons.Notes else HubIcons.Matches, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.secondary)
-                Text(if (entry.kind == "NOTE") "NOTATKA" else "TYP WYNIKU", color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.labelSmall)
+        Row(Modifier.padding(start = 16.dp, top = 8.dp, end = 4.dp, bottom = 8.dp)) {
+            Column(Modifier.weight(1f).padding(top = 8.dp, end = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(if (entry.kind == "NOTE") HubIcons.Notes else HubIcons.Matches, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.secondary)
+                    Text(if (entry.kind == "NOTE") "NOTATKA" else "TYP WYNIKU", color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.labelSmall)
+                }
+                if (entry.kind == "PREDICTION") Text("${entry.homeScore} : ${entry.awayScore}", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
+                if (entry.text.isNotBlank()) Text(entry.text)
             }
-            if (entry.kind == "PREDICTION") Text("${entry.homeScore} : ${entry.awayScore}", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary)
-            if (entry.text.isNotBlank()) Text(entry.text)
-            Row {
-                TextButton(edit) { Icon(HubIcons.Notes, null, Modifier.size(18.dp)); Spacer(Modifier.width(HubSpace.sm)); Text("Edytuj") }
-                Spacer(Modifier.weight(1f))
-                TextButton({ confirm = true }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Icon(HubIcons.Delete, null, Modifier.size(18.dp)); Spacer(Modifier.width(HubSpace.sm)); Text("Usuń") }
+            Column {
+                EntryAction("Usuń", HubIcons.Delete, MaterialTheme.colorScheme.error) { confirm = true }
+                EntryAction("Edytuj", HubIcons.Notes, MaterialTheme.colorScheme.primary, edit)
             }
         }
     }
@@ -45,19 +46,27 @@ import pl.stasgroch.footballhub.data.model.*
     val filtered = entries.filter { kind == "ALL" || it.kind == kind }
     LazyColumn(contentPadding = navigationListPadding(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { SectionTitle("Moje typy i notatki", "Twój osobisty dziennik meczowy") }
-        item { Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(HubSpace.sm)) {
-            listOf("ALL" to "Wszystkie", "NOTE" to "Notatki", "PREDICTION" to "Typy").forEach { (id, label) ->
-                FilterChip(kind == id, { changeKind(id) }, { Text(label) })
+        item {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf("ALL" to "Wszystkie", "NOTE" to "Notatki", "PREDICTION" to "Typy").forEach { (id, label) ->
+                        FilterChip(kind == id, { changeKind(id) }, { Text(label, style = MaterialTheme.typography.labelSmall) })
+                    }
+                }
+                FilledIconButton(browse, Modifier.size(48.dp), shape = MaterialTheme.shapes.small) {
+                    Icon(HubIcons.Plus, "Wybierz mecz i dodaj wpis")
+                }
             }
-        } }
-        item { PrimaryAction("Wybierz mecz i dodaj wpis", onClick = browse) }
+        }
         if (filtered.isEmpty()) item { EmptyState("Jeszcze nie ma wpisów w tej kategorii. Dodaj pierwszy w szczegółach meczu.") }
-        items(filtered, key = { it.id }) { entry ->
-            val match = data.matches.find { it.id == entry.matchId }
-            Column {
-                TextButton({ openMatch(entry.matchId) }) { Text(match?.let { "${data.team(it.homeId).shortName} – ${data.team(it.awayId).shortName}" } ?: "Mecz #${entry.matchId}") }
-                EntryCard(entry, { edit(entry) }, { delete(entry.id) })
+        filtered.groupBy { it.matchId }.forEach { (matchId, matchEntries) ->
+            item(key = "match-$matchId") {
+                val match = data.matches.find { it.id == matchId }
+                TextButton({ openMatch(matchId) }, Modifier.testTag("journal-match-$matchId")) {
+                    Text(match?.let { "${data.team(it.homeId).shortName} – ${data.team(it.awayId).shortName}" } ?: "Mecz #$matchId")
+                }
             }
+            items(matchEntries, key = { it.id }) { entry -> EntryCard(entry, { edit(entry) }, { delete(entry.id) }) }
         }
     }
 }
@@ -111,14 +120,16 @@ import pl.stasgroch.footballhub.data.model.*
                             Text(team.name, style = MaterialTheme.typography.titleMedium)
                             Text(team.city, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        Icon(HubIcons.Next, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        IconButton({ remove(team.id) }) { Icon(HubIcons.StarFilled, "Usuń z ulubionych", tint = MaterialTheme.colorScheme.primary) }
                     }
-                    TextButton({ remove(team.id) }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Usuń z ulubionych") }
+
                 }
             }
         }
     }
 }
+
+
 
 
 

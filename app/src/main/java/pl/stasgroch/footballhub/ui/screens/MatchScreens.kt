@@ -39,10 +39,8 @@ import java.time.LocalDate
 @Composable fun MatchesScreen(data: FootballData, filters: MatchFilters, listState: LazyListState, openMatch: (Int) -> Unit) {
     val league = filters.league
     val status = filters.status
-    val query = filters.query
     val filtered = data.matches.filter {
-        it.date == filters.date && (league == 0 || it.leagueId == league) && (status == "ALL" || it.status == status || (status == "LIVE" && it.status in listOf("IN_PLAY", "IN_PROGRESS"))) &&
-        (data.team(it.homeId).name.contains(query, true) || data.team(it.awayId).name.contains(query, true))
+        it.date == filters.date && (league == 0 || it.leagueId == league) && (status == "ALL" || it.status == status || (status == "LIVE" && it.status in listOf("IN_PLAY", "IN_PROGRESS")))
     }.sortedWith(compareBy<Match> { it.date }.thenBy { it.time })
     LazyColumn(state = listState, modifier = Modifier.testTag("match-list"), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 112.dp)) {
         item { SectionTitle("Centrum meczowe", "Terminarz i wyniki • ${filtered.size} spotkań") }
@@ -98,6 +96,8 @@ import java.time.LocalDate
         }
     }
 }
+
+
 
 
 
