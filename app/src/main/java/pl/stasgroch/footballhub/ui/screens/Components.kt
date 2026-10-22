@@ -21,7 +21,8 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 // Fixed reserve for the expanded overlay; independent of the animation's current height.
-fun navigationListPadding() = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 112.dp)
+fun detailListPadding() = PaddingValues(16.dp)
+fun navigationListPadding() = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 96.dp)
 
 fun displayDate(value: String): String = runCatching {
     LocalDate.parse(value).format(DateTimeFormatter.ofPattern("d MMM", Locale.forLanguageTag("pl")))

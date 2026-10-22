@@ -1,6 +1,9 @@
 package pl.stasgroch.footballhub.ui.navigation
 
-import pl.stasgroch.footballhub.ui.theme.hubGlass
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -54,17 +57,25 @@ class NavigationScrollState(private val threshold: Float) : NestedScrollConnecti
 
 @Composable fun FloatingNavigation(tabs: List<Triple<String, String, ImageVector>>, active: String,
     expanded: Boolean, modifier: Modifier = Modifier, navigate: (String) -> Unit) {
-    val labelHeight by animateDpAsState(if (expanded) 24.dp else 0.dp, tween(220), label = "navigation-label-height")
-    val alpha by animateFloatAsState(if (expanded) 1f else 0f, tween(180), label = "navigation-label-alpha")
-    Surface(modifier = modifier.hubGlass(RoundedCornerShape(28.dp)).testTag("floating-navigation").semantics { stateDescription = if (expanded) "Rozwinięta" else "Zwinięta" },
+    val labelHeight by animateDpAsState(if (expanded) 22.dp else 0.dp, tween(200), label = "navigation-label-height")
+    val padding by animateDpAsState(if (expanded) 6.dp else 2.dp, tween(200), label = "navigation-padding")
+    val outerPadding by animateDpAsState(if (expanded) 3.dp else 1.dp, tween(200), label = "navigation-outer-padding")
+    val width by animateFloatAsState(if (expanded) 1f else .88f, tween(200), label = "navigation-width")
+    val alpha by animateFloatAsState(if (expanded) 1f else 0f, tween(160), label = "navigation-label-alpha")
+    val shape = RoundedCornerShape(28.dp)
+    Surface(modifier = modifier.fillMaxWidth(width).clip(shape)
+        .background(Brush.verticalGradient(listOf(Color(0xF026343D), Color(0xF01C2931))))
+        .border(.5.dp, Color.White.copy(alpha = .09f), shape)
+        .testTag("floating-navigation").semantics { stateDescription = if (expanded) "Rozwinięta" else "Zwinięta" },
         shape = RoundedCornerShape(28.dp), color = Color.Transparent) {
-        Row(Modifier.fillMaxWidth().selectableGroup().padding(4.dp)) {
+        Row(Modifier.fillMaxWidth().selectableGroup().padding(outerPadding)) {
             tabs.forEach { (path, label, icon) ->
                 val selected = active == path
                 Surface(shape = RoundedCornerShape(24.dp), color = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
                     modifier = Modifier.weight(1f)) {
                     Column(Modifier.heightIn(min = 48.dp).selectable(selected, role = Role.Tab, onClick = { navigate(path) })
-                        .semantics { contentDescription = label }.padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        .semantics { contentDescription = label }.padding(vertical = padding), horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center) {
                         Icon(icon, null, Modifier.size(24.dp), tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                         Box(Modifier.height(labelHeight).clipToBounds().graphicsLayer { this.alpha = alpha }, contentAlignment = Alignment.BottomCenter) {
                             Text(label, Modifier.clearAndSetSemantics {}, maxLines = 1, softWrap = false, style = MaterialTheme.typography.labelSmall,

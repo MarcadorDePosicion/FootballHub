@@ -1,16 +1,14 @@
 package pl.stasgroch.footballhub.ui.screens
 
-import pl.stasgroch.footballhub.ui.theme.hubGlass
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.semantics.Role
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.pager.*
+import androidx.compose.foundation.lazy.rememberLazyListState
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.drop
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.testTag
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -26,7 +24,7 @@ import java.time.LocalDate
 @Composable fun HomeScreen(data: FootballData, listState: LazyListState, openMatch: (Int) -> Unit) {
     val today = data.matches.filter { it.date == LocalDate.now().toString() }.sortedBy { it.time }
     val recent = data.matches.filter { it.status == "FINISHED" }.sortedWith(compareByDescending<Match> { it.date }.thenByDescending { it.time })
-    LazyColumn(state = listState, modifier = Modifier.testTag("match-list"), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 112.dp)) {
+    LazyColumn(state = listState, modifier = Modifier.testTag("match-list"), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp)) {
         item { Text("FOOTBALL HUB • lokalny mock, bez danych na żywo", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         item { SectionTitle("Mecze dnia", "${displayDate(LocalDate.now().toString())} • Spotkania: ${today.size}") }
         if (today.isEmpty()) item { EmptyState("Brak spotkań na dziś. Sprawdź pełny terminarz w zakładce Mecze.", HubIcons.Matches) }
@@ -36,28 +34,57 @@ import java.time.LocalDate
         groupedMatches("recent", recent, data, openMatch)
     }
 }
-@Composable fun MatchesScreen(data: FootballData, filters: MatchFilters, listState: LazyListState, openMatch: (Int) -> Unit) {
-    val league = filters.league
-    val status = filters.status
-    val filtered = data.matches.filter {
-        it.date == filters.date && (league == 0 || it.leagueId == league) && (status == "ALL" || it.status == status || (status == "LIVE" && it.status in listOf("IN_PLAY", "IN_PROGRESS")))
-    }.sortedWith(compareBy<Match> { it.date }.thenBy { it.time })
-    LazyColumn(state = listState, modifier = Modifier.testTag("match-list"), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 112.dp)) {
-        item { SectionTitle("Centrum meczowe", "Terminarz i wyniki • ${filtered.size} spotkań") }
-        item { MatchFilterPanel(data, filters) }
-        if (filtered.isEmpty()) item { EmptyState("Brak meczów dla wybranych filtrów.", HubIcons.Search) }
-        if (filters.chronological) filtered.forEach { match ->
-            groupedMatches("time-${match.id}", listOf(match), data, openMatch)
-        } else groupedMatches("filtered", filtered, data, openMatch)
+@Composable fun MatchesScreen(data: FootballData, filters: MatchFilters, onActiveList: (LazyListState) -> Unit, openMatch: (Int) -> Unit) {
+    val anchor = rememberSaveable { LocalDate.parse(filters.date).toEpochDay() }
+    val selected = (LocalDate.parse(filters.date).toEpochDay() - anchor).toInt() + 100000
+    val pager = rememberPagerState(initialPage = selected) { 200001 }
+    LaunchedEffect(selected) {
+        if (selected != pager.currentPage) pager.animateScrollToPage(selected)
+    }
+    LaunchedEffect(pager) {
+        snapshotFlow { pager.settledPage }.drop(1).collect { page ->
+            filters.date = LocalDate.ofEpochDay(anchor + page - 100000).toString()
+        }
+    }
+    val count = data.matches.count {
+        it.date == filters.date && (filters.league == 0 || it.leagueId == filters.league) &&
+            (filters.status == "ALL" || it.status == filters.status)
+    }
+    Column(Modifier.fillMaxSize()) {
+        Column(Modifier.padding(horizontal = 16.dp)) {
+            SectionTitle("Centrum meczowe", "Terminarz i wyniki • $count spotkań")
+            MatchFilterPanel(data, filters)
+        }
+        HorizontalPager(pager, Modifier.weight(1f).testTag("days-pager")) { page ->
+            val date = LocalDate.ofEpochDay(anchor + page - 100000).toString()
+            val pageList = rememberLazyListState()
+            LaunchedEffect(page, pager.currentPage) {
+                if (page == pager.currentPage) onActiveList(pageList)
+            }
+            val filtered = data.matches.filter {
+                it.date == date && (filters.league == 0 || it.leagueId == filters.league) &&
+                    (filters.status == "ALL" || it.status == filters.status)
+            }.sortedBy { it.time }
+            LazyColumn(state = pageList, modifier = Modifier.pageSemantics(pager, page).fillMaxSize()
+                .testTag(if (page == pager.currentPage) "match-list" else "match-list-$page"),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp)) {
+                if (filtered.isEmpty()) item { EmptyState("Brak meczów dla wybranych filtrów.", HubIcons.Search) }
+                if (filters.chronological) filtered.forEach { match ->
+                    groupedMatches("time-${match.id}", listOf(match), data, openMatch)
+                } else groupedMatches("filtered", filtered, data, openMatch)
+            }
+        }
     }
 }
-@Composable fun MatchDetailsScreen(id: Int, data: FootballData, openTeam: (Int) -> Unit, openLeague: (Int) -> Unit, actions: @Composable (Match) -> Unit = {}, content: @Composable ColumnScope.(Match) -> Unit = {}) {
+@Composable fun MatchDetailsScreen(id: Int, data: FootballData, openTeam: (Int) -> Unit, openLeague: (Int) -> Unit, openPlayer: (Int) -> Unit = {}, actions: @Composable (Match) -> Unit = {}, content: @Composable ColumnScope.(Match) -> Unit = {}) {
     val match = data.matches.find { it.id == id }
     if (match == null) { EmptyState("Nie znaleziono meczu."); return }
     val home = data.team(match.homeId)
     val away = data.team(match.awayId)
-    var tab by rememberSaveable(id) { mutableIntStateOf(0) }
-    LazyColumn(contentPadding = navigationListPadding(), verticalArrangement = Arrangement.spacedBy(HubSpace.md)) {
+    val pager = rememberPagerState { 2 }
+    val scope = rememberCoroutineScope()
+    val tab = pager.currentPage
+    LazyColumn(modifier = Modifier.fillMaxSize().testTag("match-detail-list"), contentPadding = detailListPadding(), verticalArrangement = Arrangement.spacedBy(HubSpace.md)) {
         item { actions(match) }
         item {
             Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface) {
@@ -77,45 +104,39 @@ import java.time.LocalDate
                             Text(away.name, textAlign = TextAlign.Center, style = MaterialTheme.typography.titleSmall)
                         }
                     }
+                    MatchScorers(match, data, openPlayer)
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     Text("Stadion: ${home.stadium}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
                 }
             }
         }
+        item { MatchTimeline(match, data, openPlayer) }
         item { Column(verticalArrangement = Arrangement.spacedBy(HubSpace.sm)) { content(match) } }
         item {
             SecondaryTabRow(tab) {
                 listOf("Składy", "Tabela").forEachIndexed { index, label ->
-                    Tab(tab == index, { tab = index }, text = { Text(label) }, modifier = Modifier.testTag("match-tab-$index"))
+                    Tab(tab == index, { scope.launch { pager.animateScrollToPage(index) } }, text = { Text(label) }, modifier = Modifier.testTag("match-tab-$index"))
                 }
             }
         }
-        if (tab == 0) item { MatchLineups(match, data) } else {
         item {
-            TextButton({ openLeague(match.leagueId) }, Modifier.fillMaxWidth()) {
-                Text("Tabela ligi", style = MaterialTheme.typography.titleSmall)
-                Spacer(Modifier.weight(1f))
-                Text("Zobacz ligę", style = MaterialTheme.typography.labelSmall)
-                Icon(HubIcons.Next, null)
+            MeasuredContentPager(pager, Modifier.testTag("match-pages")) { page ->
+                if (page == 0) {
+                    MatchLineups(match, data, openPlayer)
+                } else {
+                    Column {
+                        TextButton({ openLeague(match.leagueId) }, Modifier.fillMaxWidth()) {
+                            Text("Tabela ligi", style = MaterialTheme.typography.titleSmall)
+                            Spacer(Modifier.weight(1f))
+                            Text("Zobacz ligę", style = MaterialTheme.typography.labelSmall)
+                            Icon(HubIcons.Next, null)
+                        }
+                        val rows = data.standings.filter { it.leagueId == match.leagueId }.sortedByDescending { it.points }
+                        if (rows.isEmpty()) EmptyState("Tabela tej ligi nie jest jeszcze dostępna.")
+                        else StandingsTable(rows, data, emptySet(), openTeam, highlightedTeamIds = setOf(home.id, away.id))
+                    }
+                }
             }
-        }
-        item {
-            val rows = data.standings.filter { it.leagueId == match.leagueId }.sortedByDescending { it.points }
-            if (rows.isEmpty()) EmptyState("Tabela tej ligi nie jest jeszcze dostępna.")
-            else StandingsTable(rows, data, emptySet(), openTeam, highlightedTeamIds = setOf(home.id, away.id))
-        }
         }
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-

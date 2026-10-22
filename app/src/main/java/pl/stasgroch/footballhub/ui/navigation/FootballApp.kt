@@ -3,6 +3,7 @@ package pl.stasgroch.footballhub.ui.navigation
 import androidx.compose.foundation.layout.*
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.foundation.lazy.rememberLazyListState
+import kotlinx.coroutines.launch
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -33,18 +34,27 @@ import pl.stasgroch.footballhub.ui.theme.hubHeaderGradient
     val entry by nav.currentBackStackEntryAsState()
     val route = entry?.destination?.route ?: "home"
     val tabs = listOf(Triple("home","Start",HubIcons.Home), Triple("matches","Mecze",HubIcons.Matches), Triple("leagues","Ligi",HubIcons.Leagues), Triple("favorites","Ulubione",HubIcons.Star), Triple("journal","Moje",HubIcons.Notes))
+    val searchScroll = androidx.compose.foundation.rememberScrollState()
+    val searchState = rememberSaveable(saver = HeaderSearchState.Saver) { HeaderSearchState() }
     val matchFilters = rememberSaveable(saver = MatchFilters.Saver) { MatchFilters() }
     var journalFilter by rememberSaveable { mutableStateOf("ALL") }
     var activeTab by rememberSaveable { mutableStateOf("home") }
     LaunchedEffect(route) { if (tabs.any { it.first == route }) activeTab = route }
     val homeList = rememberLazyListState()
-    val matchesList = rememberLazyListState()
+    var matchesList by remember { mutableStateOf(androidx.compose.foundation.lazy.LazyListState()) }
+    val leaguesList = rememberLazyListState()
+    val favoritesList = rememberLazyListState()
+    val journalList = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    var returnToTop by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    val mainLists = mapOf("home" to homeList, "matches" to matchesList, "leagues" to leaguesList,
+        "favorites" to favoritesList, "journal" to journalList)
     val scroll = rememberNavigationScrollState()
-    val showNavigation = !route.startsWith("form/")
-    val currentList = if (route == "matches") matchesList else homeList
+    val showNavigation = tabs.any { it.first == route }
+    val currentList = mainLists[route]
     LaunchedEffect(route, currentList) {
         scroll.expand()
-        snapshotFlow { currentList.canScrollBackward }.collect { if (!it) scroll.expand() }
+        if (currentList != null) snapshotFlow { currentList.canScrollBackward }.collect { if (!it) scroll.expand() }
     }
     Box(Modifier.fillMaxSize()) {
     Scaffold(
@@ -52,11 +62,12 @@ import pl.stasgroch.footballhub.ui.theme.hubHeaderGradient
             if (tabs.none { it.first == route }) {
                 Row(Modifier.fillMaxWidth().hubHeaderGradient().statusBarsPadding().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
                     IconButton({ nav.popBackStack() }) { Icon(HubIcons.Back, "Wstecz") }
+                    if (route == "player/{id}") Text("Profil zawodnika", style = MaterialTheme.typography.titleLarge)
                     if (route == "match/{id}") Text("Szczegóły meczu", style = MaterialTheme.typography.titleLarge)
                 }
             } else {
             TopAppBar(title = {
-                HeaderSearch(state.data.teams, state.data.players, openPlayer = { player -> nav.navigate("team/${player.teamId}?player=${player.id}") }) { teamId ->
+                HeaderSearch(state.data.teams, state.data.players, searchState, openPlayer = { player -> nav.navigate("player/${player.id}") }, resultScroll = searchScroll) { teamId ->
                     nav.navigate("team/$teamId")
                 }            }, navigationIcon = {
                 if (route !in tabs.map { it.first }) IconButton({ nav.popBackStack() }) { Icon(HubIcons.Back, "Wstecz") }
@@ -88,11 +99,11 @@ import pl.stasgroch.footballhub.ui.theme.hubHeaderGradient
             val data = state.data
             NavHost(navController = nav, startDestination = "home", modifier = Modifier.weight(1f).nestedScroll(scroll)) {
                 composable("home") { HomeScreen(data, homeList) { nav.navigate("match/$it") } }
-                composable("matches") { MatchesScreen(data, matchFilters, matchesList) { nav.navigate("match/$it") } }
-                composable("leagues") { LeaguesScreen(data) { nav.navigate("league/$it") } }
+                composable("matches") { MatchesScreen(data, matchFilters, { matchesList = it }) { nav.navigate("match/$it") } }
+                composable("leagues") { LeaguesScreen(data, leaguesList) { nav.navigate("league/$it") } }
                 composable("league/{id}") { StandingsScreen(it.arguments?.getString("id")?.toIntOrNull() ?: -1, data, favorites, openMatch = { id -> nav.navigate("match/$id") }, back = { nav.popBackStack() }) { id -> nav.navigate("team/$id") } }
                 composable("team/{id}?player={player}") {
-                    TeamScreen(it.arguments?.getString("id")?.toIntOrNull() ?: -1, data, { id -> nav.navigate("match/$id") }, openTeam = { id -> nav.navigate("team/$id") { launchSingleTop = true } }, back = { nav.popBackStack() }, highlightedPlayerId = it.arguments?.getString("player")?.toIntOrNull()) { team ->
+                    TeamScreen(it.arguments?.getString("id")?.toIntOrNull() ?: -1, data, { id -> nav.navigate("match/$id") }, openTeam = { id -> nav.navigate("team/$id") { launchSingleTop = true } }, back = { nav.popBackStack() }, highlightedPlayerId = it.arguments?.getString("player")?.toIntOrNull(), openPlayer = { id -> nav.navigate("player/$id") }) { team ->
                         IconToggleButton(checked = team.id in favorites, onCheckedChange = { vm.favorite(team.id, it) }, enabled = !saving) {
                             Icon(if (team.id in favorites) HubIcons.StarFilled else HubIcons.Star,
                                 if (team.id in favorites) "Usuń z ulubionych" else "Dodaj do ulubionych",
@@ -101,7 +112,7 @@ import pl.stasgroch.footballhub.ui.theme.hubHeaderGradient
                     }
                 }
                 composable("match/{id}") {
-                    MatchDetailsScreen(it.arguments?.getString("id")?.toIntOrNull() ?: -1, data, { id -> nav.navigate("team/$id") }, { id -> nav.navigate("league/$id") }, actions = { match ->
+                    MatchDetailsScreen(it.arguments?.getString("id")?.toIntOrNull() ?: -1, data, { id -> nav.navigate("team/$id") }, { id -> nav.navigate("league/$id") }, openPlayer = { id -> nav.navigate("player/$id") }, actions = { match ->
                         Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button({ nav.navigate("form/${match.id}/NOTE/new") }, Modifier.weight(1f).fillMaxHeight().heightIn(min = 48.dp),
                                 contentPadding = PaddingValues(horizontal = 8.dp), shape = MaterialTheme.shapes.medium) {
@@ -118,8 +129,12 @@ import pl.stasgroch.footballhub.ui.theme.hubHeaderGradient
                         own.forEach { e -> EntryCard(e, { nav.navigate("form/${e.matchId}/${e.kind}/${e.id}") }, { vm.deleteEntry(e.id) }) }
                     }
                 }
-                composable("favorites") { FavoritesScreen(data, favorites, { nav.navigate("team/$it") }, { vm.favorite(it, false) }, { nav.navigate("leagues") }) }
-                composable("journal") { JournalScreen(data, entries, journalFilter, { journalFilter = it }, { nav.navigate("match/$it") }, { nav.navigate("form/${it.matchId}/${it.kind}/${it.id}") }, vm::deleteEntry, { nav.navigate("matches") }) }
+                composable("player/{id}") {
+                    PlayerScreen(it.arguments?.getString("id")?.toIntOrNull() ?: -1, data,
+                        openMatch = { id -> nav.navigate("match/$id") }, openTeam = { id -> nav.navigate("team/$id") })
+                }
+                composable("favorites") { FavoritesScreen(data, favorites, { nav.navigate("team/$it") }, { vm.favorite(it, false) }, { nav.navigate("leagues") }, favoritesList) }
+                composable("journal") { JournalScreen(data, entries, journalFilter, { journalFilter = it }, { nav.navigate("match/$it") }, { nav.navigate("form/${it.matchId}/${it.kind}/${it.id}") }, vm::deleteEntry, { nav.navigate("matches") }, journalList) }
                 composable("form/{matchId}/{kind}/{entryId}") { backStack ->
                     val matchId = backStack.arguments?.getString("matchId")?.toIntOrNull() ?: -1
                     val kind = backStack.arguments?.getString("kind") ?: "NOTE"
@@ -133,7 +148,14 @@ import pl.stasgroch.footballhub.ui.theme.hubHeaderGradient
     }
         if (showNavigation) FloatingNavigation(tabs, activeTab, scroll.expanded,
             Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(horizontal = 16.dp, vertical = 10.dp)) { path ->
-            nav.navigate(path) { popUpTo("home"); launchSingleTop = true }
+            if (route == path) {
+                mainLists[path]?.let { list ->
+                    if (list.canScrollBackward && returnToTop?.isActive != true) returnToTop = scope.launch {
+                        list.animateScrollToItem(0)
+                        scroll.expand()
+                    }
+                }
+            } else nav.navigate(path) { popUpTo("home"); launchSingleTop = true }
         }
     }
 }

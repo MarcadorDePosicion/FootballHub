@@ -6,8 +6,14 @@ import pl.stasgroch.footballhub.data.remote.MockFootballInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
-class FootballRepository(private val api: FootballApi) {
-    suspend fun load() = api.football()
+/** A future backend adapter maps provider DTOs to domain models before returning data. */
+fun interface FootballDataSource {
+    suspend fun load(): pl.stasgroch.footballhub.data.model.FootballData
+}
+
+class FootballRepository(private val source: FootballDataSource) {
+    constructor(api: FootballApi) : this(FootballDataSource { api.football() })
+    suspend fun load() = source.load()
 
     companion object {
         // To connect a real backend, replace the URL and remove the mock interceptor.

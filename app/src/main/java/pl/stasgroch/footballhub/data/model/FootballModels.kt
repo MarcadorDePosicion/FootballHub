@@ -7,11 +7,17 @@ data class Standing(val leagueId: Int, val teamId: Int, val played: Int, val won
     val points: Int get() = won * 3 + drawn
 }
 enum class PlayerPosition(val label: String) { GOALKEEPER("Bramkarze"), DEFENDER("Obrońcy"), MIDFIELDER("Pomocnicy"), FORWARD("Napastnicy") }
-data class Player(val id: Int, val teamId: Int, val name: String, val number: Int? = null,
-    val position: PlayerPosition? = null, val nationality: String? = null, val demo: Boolean = false)
+data class Player(val id: Int, val teamId: Int?, val name: String, val number: Int? = null,
+    val position: PlayerPosition? = null, val nationality: String? = null, val demo: Boolean = false,
+    val dateOfBirth: String? = null, val heightCm: Int? = null, val preferredFoot: PreferredFoot? = null,
+    val externalId: ExternalId? = null) {
+    fun age(today: java.time.LocalDate = java.time.LocalDate.now()): Int? =
+        dateOfBirth?.let { runCatching { java.time.LocalDate.parse(it) }.getOrNull() }
+            ?.takeUnless { it.isAfter(today) }?.let { java.time.Period.between(it, today).years }
+}
 /** Rows run from goalkeeper to attack; order within a row runs from left to right. */
 data class MatchLineup(val matchId: Int, val teamId: Int, val formation: String? = null,
-    val starterRows: List<List<Int>>? = null, val substitutes: List<Int>? = null, val demo: Boolean = false) {
+    val starterRows: List<List<Int>>? = null, val substitutes: List<Int>? = null, val demo: Boolean = false, val coach: Coach? = null) {
     fun hasValidFormation(): Boolean {
         val lines = formation?.split("-")?.map { it.toIntOrNull() ?: return false } ?: return false
         val rows = starterRows ?: return false
@@ -20,7 +26,8 @@ data class MatchLineup(val matchId: Int, val teamId: Int, val formation: String?
     }
 }
 data class FootballData(val teams: List<Team> = emptyList(), val leagues: List<League> = emptyList(), val matches: List<Match> = emptyList(), val standings: List<Standing> = emptyList(),
-    val players: List<Player> = emptyList(), val lineups: List<MatchLineup> = emptyList()) {
+    val players: List<Player> = emptyList(), val lineups: List<MatchLineup> = emptyList(),
+    val matchEvents: List<MatchEvents> = emptyList(), val appearances: List<PlayerAppearance> = emptyList()) {
     fun team(id: Int) = teams.first { it.id == id }
 }
 

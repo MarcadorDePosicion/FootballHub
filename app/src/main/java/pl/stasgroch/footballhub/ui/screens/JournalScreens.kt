@@ -1,6 +1,8 @@
 package pl.stasgroch.footballhub.ui.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
@@ -42,9 +44,9 @@ import pl.stasgroch.footballhub.data.model.*
         confirmButton = { TextButton({ confirm = false; delete() }, colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("Usuń wpis") } },
         dismissButton = { TextButton({ confirm = false }) { Text("Anuluj") } })
 }
-@Composable fun JournalScreen(data: FootballData, entries: List<JournalEntry>, kind: String, changeKind: (String) -> Unit, openMatch: (Int) -> Unit, edit: (JournalEntry) -> Unit, delete: (String) -> Unit, browse: () -> Unit) {
+@Composable fun JournalScreen(data: FootballData, entries: List<JournalEntry>, kind: String, changeKind: (String) -> Unit, openMatch: (Int) -> Unit, edit: (JournalEntry) -> Unit, delete: (String) -> Unit, browse: () -> Unit, listState: LazyListState = rememberLazyListState()) {
     val filtered = entries.filter { kind == "ALL" || it.kind == kind }
-    LazyColumn(contentPadding = navigationListPadding(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    LazyColumn(state = listState, contentPadding = navigationListPadding(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { SectionTitle("Moje typy i notatki", "Twój osobisty dziennik meczowy") }
         item {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -107,8 +109,8 @@ import pl.stasgroch.footballhub.data.model.*
         TextButton(cancel, enabled = !saving, modifier = Modifier.fillMaxWidth().heightIn(min = HubSpace.touch)) { Text("Anuluj") }
     }
 }
-@Composable fun FavoritesScreen(data: FootballData, favorites: Set<Int>, openTeam: (Int) -> Unit, remove: (Int) -> Unit, browse: () -> Unit) {
-    LazyColumn(contentPadding = navigationListPadding(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+@Composable fun FavoritesScreen(data: FootballData, favorites: Set<Int>, openTeam: (Int) -> Unit, remove: (Int) -> Unit, browse: () -> Unit, listState: LazyListState = rememberLazyListState()) {
+    LazyColumn(state = listState, contentPadding = navigationListPadding(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { SectionTitle("Ulubione drużyny", "Twoje kluby zawsze pod ręką") }
         if (favorites.isEmpty()) item { Column(verticalArrangement = Arrangement.spacedBy(HubSpace.md)) { EmptyState("Nie masz jeszcze ulubionych. Otwórz drużynę z tabeli ligi lub szczegółów meczu.", HubIcons.Star); PrimaryAction("Przeglądaj ligi", onClick = browse) } }
         items(data.teams.filter { it.id in favorites }, key = { it.id }) { team ->

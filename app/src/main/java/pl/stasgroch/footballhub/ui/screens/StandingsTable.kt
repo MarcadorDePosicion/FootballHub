@@ -5,6 +5,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.unit.Velocity
+import androidx.compose.ui.input.nestedscroll.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -34,7 +38,15 @@ import pl.stasgroch.footballhub.ui.theme.HubSpace
         // Grow numeric columns with text size; truncate the flexible name before scrolling.
         val minimumWidth = HubSpace.md * 2 + positionWidth + playedWidth + goalsWidth + pointsWidth + 128.dp
         val tableWidth = maxOf(maxWidth, minimumWidth)
-        Column(Modifier.testTag("standings-scroll").horizontalScroll(rememberScrollState())) {
+        // A wide table owns its horizontal gesture, including motion past its edge.
+        // Otherwise the residual fling would unexpectedly turn the surrounding page.
+        val tableGesture = remember { object : NestedScrollConnection {
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource) = Offset(available.x, 0f)
+            override suspend fun onPostFling(consumed: Velocity, available: Velocity) = Velocity(available.x, 0f)
+        } }
+        Column(Modifier.testTag("standings-scroll")
+            .then(if (tableWidth > maxWidth) Modifier.nestedScroll(tableGesture) else Modifier)
+            .horizontalScroll(rememberScrollState(), enabled = tableWidth > maxWidth)) {
             Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface, modifier = Modifier.width(tableWidth)) {
                 Column {
                     Row(Modifier.fillMaxWidth().padding(horizontal = HubSpace.md, vertical = HubSpace.md), verticalAlignment = Alignment.CenterVertically) {

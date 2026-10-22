@@ -31,12 +31,19 @@ class FootballUiTest {
         rule.waitUntil(15000) { (rule.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty() || rule.onAllNodesWithContentDescription(text).fetchSemanticsNodes().isNotEmpty()) }
     }
     private fun click(text: String) {
+        if (text in listOf("Start", "Mecze", "Ligi", "Ulubione", "Moje")) {
+            repeat(6) {
+                if (rule.onAllNodesWithTag("floating-navigation").fetchSemanticsNodes().isEmpty()) {
+                    androidx.test.espresso.Espresso.pressBack(); rule.waitForIdle()
+                }
+            }
+        }
         if (rule.onAllNodesWithContentDescription(text).fetchSemanticsNodes().isNotEmpty()) rule.onNodeWithContentDescription(text).performClick()
         else rule.onNodeWithText(text).performClick()
     }
     private fun entryAction(text: String, action: String) {
         val id = runBlocking { FootballDatabase.get(rule.activity).userDao().entries().first().single { it.text == text }.id }
-        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("entry-$id"))
+        rule.onNode(hasScrollToIndexAction() and androidx.compose.ui.test.SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.VerticalScrollAxisRange)).performScrollToNode(hasTestTag("entry-$id"))
         rule.onNode(hasContentDescription(action) and hasAnyAncestor(hasTestTag("entry-$id"))).performClick()
     }
     private fun screenshot(name: String) {
@@ -52,7 +59,7 @@ class FootballUiTest {
     }
     private fun scrollClick(text: String) {
         val target = hasText(text) and hasSetTextAction().not()
-        rule.onNode(hasScrollToIndexAction()).performScrollToNode(target)
+        rule.onNode(hasScrollToIndexAction() and androidx.compose.ui.test.SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.VerticalScrollAxisRange)).performScrollToNode(target)
         rule.onNode(target).performClick()
     }
 
@@ -74,6 +81,121 @@ class FootballUiTest {
         rule.onAllNodesWithText("FC Barcelona").onFirst().assertExists()
     }
 
+    @Test fun reselectMainTabScrollsUpAndPreservesFiltersAndDate() {
+        waitFor("Mecze dnia")
+        rule.onNodeWithTag("match-list").performTouchInput { swipeUp() }
+        click("Start")
+        rule.waitForIdle()
+        rule.onNodeWithText("Mecze dnia").assertIsDisplayed()
+        click("Mecze")
+        click("Poprzedni dzień")
+        click("Filtry")
+        click("Zakończone")
+        click("Zastosuj")
+        rule.onNodeWithTag("match-list").performTouchInput { swipeUp() }
+        click("Mecze")
+        rule.waitForIdle()
+        rule.onNodeWithText("Wczoraj").assertIsDisplayed()
+        rule.onNodeWithText("Filtry (1)").assertIsDisplayed()
+        click("Mecze")
+        rule.onNodeWithText("Wczoraj").assertIsDisplayed()
+        screenshot("navigation-reselected")
+        scrollClick("Manchester City")
+        rule.onNodeWithTag("floating-navigation").assertDoesNotExist()
+        click("Wstecz")
+        rule.onNodeWithTag("floating-navigation").assertIsDisplayed()
+        rule.onNodeWithContentDescription("Mecze").assertIsSelected()
+        rule.onNodeWithText("Wczoraj").assertIsDisplayed()
+    }
+
+    @Test fun dayPagesFollowFingerBeforeRelease() {
+        waitFor("Mecze dnia")
+        click("Mecze")
+        val title = rule.onNodeWithText("Centrum meczowe").fetchSemanticsNode().boundsInRoot
+        val pager = rule.onNodeWithTag("days-pager")
+        pager.performTouchInput {
+            down(androidx.compose.ui.geometry.Offset(width * .85f, height * .3f))
+            moveBy(androidx.compose.ui.geometry.Offset(-width * .4f, 0f), 400)
+        }
+        rule.waitForIdle()
+        rule.onNodeWithText("Liverpool").assertIsDisplayed()
+        rule.onNodeWithText("Raków Częstochowa").assertIsDisplayed()
+        org.junit.Assert.assertEquals(title, rule.onNodeWithText("Centrum meczowe").fetchSemanticsNode().boundsInRoot)
+        screenshot("days-mid-drag")
+        pager.performTouchInput { cancel() }
+        rule.waitForIdle()
+    }
+
+    @Test fun horizontalGesturesChangeDaysAndDetailTabsWithoutChangingMainScreen() {
+        waitFor("Mecze dnia")
+        click("Mecze")
+        val list = rule.onNodeWithTag("match-list")
+        list.performTouchInput { swipeRight() }
+        rule.onNodeWithText("Wczoraj").assertIsDisplayed()
+        list.performTouchInput { swipeLeft() }
+        rule.onNodeWithText("Dziś").assertIsDisplayed()
+        click("Następny dzień")
+        list.performTouchInput { swipeLeft() }
+        rule.onNodeWithText("Jutro").assertDoesNotExist()
+        list.performTouchInput { swipeRight() }
+        rule.onNodeWithText("Jutro").assertIsDisplayed()
+        list.performTouchInput { swipeRight() }
+        // A tiny drag and a vertical gesture must not change the day.
+        list.performTouchInput { swipe(androidx.compose.ui.geometry.Offset(4f, centerY), androidx.compose.ui.geometry.Offset(16f, centerY), 250) }
+        rule.onNodeWithText("Dziś").assertIsDisplayed()
+        list.performTouchInput { swipeUp() }
+        click("Mecze")
+        rule.onNodeWithText("Dziś").assertIsDisplayed()
+        scrollClick("Liverpool")
+        val detail = rule.onNodeWithTag("match-detail-list")
+        detail.performScrollToNode(hasTestTag("match-pages"))
+        val pages = rule.onNodeWithTag("match-pages")
+        val titleBounds = rule.onNodeWithText("Szczegóły meczu").fetchSemanticsNode().boundsInRoot
+        pages.performTouchInput {
+            down(androidx.compose.ui.geometry.Offset(width * .85f, height * .2f))
+            moveBy(androidx.compose.ui.geometry.Offset(-width * .4f, 0f), 400)
+        }
+        rule.waitForIdle()
+        rule.onNodeWithText("Tabela ligi").assertIsDisplayed()
+        org.junit.Assert.assertEquals(titleBounds, rule.onNodeWithText("Szczegóły meczu").fetchSemanticsNode().boundsInRoot)
+        screenshot("match-mid-drag")
+        pages.performTouchInput { cancel() }
+        rule.waitForIdle()
+        pages.performTouchInput { swipeLeft() }
+        detail.performScrollToNode(hasTestTag("match-tab-1"))
+        rule.onNodeWithTag("match-tab-1").assertIsSelected()
+        rule.onNodeWithTag("match-tab-0").performClick()
+        pages.performTouchInput { swipeLeft() }
+        rule.onNodeWithTag("match-tab-1").assertIsSelected()
+        pages.performTouchInput { swipeRight() }
+        rule.onNodeWithTag("match-tab-0").assertIsSelected()
+        click("Ligi")
+        click("La Liga")
+        val league = rule.onNodeWithTag("league-list")
+        league.performTouchInput { swipeLeft() }
+        rule.onNodeWithTag("league-tab-1").assertIsSelected()
+        league.performTouchInput { swipeRight() }
+        rule.onNodeWithTag("league-tab-0").assertIsSelected()
+        click("FC Barcelona")
+        val team = rule.onNodeWithTag("team-list")
+        team.performTouchInput { swipeLeft() }
+        rule.onNodeWithTag("team-tab-1").assertIsSelected()
+        team.performTouchInput { swipeLeft() }
+        rule.onNodeWithTag("team-tab-2").assertIsSelected()
+        team.performTouchInput { swipeRight() }
+        rule.onNodeWithTag("team-tab-1").assertIsSelected()
+        rule.onNodeWithTag("team-tab-3").performClick()
+        team.performScrollToNode(hasTestTag("player-513"))
+        val playerTop = rule.onNodeWithTag("player-513").fetchSemanticsNode().boundsInRoot.top
+        team.performTouchInput { swipeRight() }
+        rule.onNodeWithTag("team-tab-2").assertIsSelected()
+        team.performTouchInput { swipeLeft() }
+        rule.onNodeWithTag("team-tab-3").assertIsSelected()
+        org.junit.Assert.assertEquals(playerTop, rule.onNodeWithTag("player-513").fetchSemanticsNode().boundsInRoot.top, 2f)
+        rule.onNodeWithTag("floating-navigation").assertDoesNotExist()
+        screenshot("team-swipe-no-navigation")
+    }
+
     @Test fun playerSearchRosterAndLineups() {
         waitFor("Mecze dnia")
         rule.onNodeWithTag("team-search").performClick().performTextInput("bruno")
@@ -81,28 +203,106 @@ class FootballUiTest {
         rule.onNodeWithTag("search-player-101").assertDoesNotExist()
         rule.onNodeWithTag("search-filter-2").performClick()
         rule.onNodeWithTag("search-player-101").performClick()
+        rule.onNodeWithTag("player-profile-101").assertIsDisplayed()
+        scrollClick("Arsenal")
+        rule.onNodeWithTag("team-tab-3").performClick()
         rule.onNodeWithTag("team-tab-3").assertIsSelected()
-        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("player-101"))
+        rule.onNode(hasScrollToIndexAction() and androidx.compose.ui.test.SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.VerticalScrollAxisRange)).performScrollToNode(hasTestTag("player-101"))
         rule.onNodeWithText("Bruno Baran").assertIsDisplayed()
         screenshot("team-players")
         click("Mecze")
         scrollClick("Liverpool")
-        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("match-tab-0"))
+        rule.onNode(hasScrollToIndexAction() and androidx.compose.ui.test.SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.VerticalScrollAxisRange)).performScrollToNode(hasTestTag("match-tab-0"))
         rule.onNodeWithTag("match-tab-0").assertIsSelected()
-        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("football-pitch"))
+        rule.onNode(hasScrollToIndexAction() and androidx.compose.ui.test.SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.VerticalScrollAxisRange)).performScrollToNode(hasTestTag("football-pitch"))
         rule.onNodeWithTag("football-pitch").assertExists()
-        rule.onNode(hasScrollToIndexAction()).performTouchInput { swipeUp(durationMillis = 500) }
+        rule.onNode(hasScrollToIndexAction() and androidx.compose.ui.test.SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.VerticalScrollAxisRange)).performTouchInput { swipeUp(durationMillis = 500) }
         screenshot("match-lineup")
-        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("lineup-away"))
+        rule.onNode(hasScrollToIndexAction() and androidx.compose.ui.test.SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.VerticalScrollAxisRange)).performScrollToNode(hasTestTag("lineup-away"))
         rule.onNodeWithTag("lineup-away").performClick()
         rule.onNodeWithText("4-3-3").assertExists()
         click("Mecze")
         click("Następny dzień")
         scrollClick("Raków Częstochowa")
-        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("Skład nie został jeszcze udostępniony."))
+        rule.onNode(hasScrollToIndexAction() and androidx.compose.ui.test.SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.VerticalScrollAxisRange)).performScrollToNode(hasText("Skład nie został jeszcze udostępniony."))
         rule.onNodeWithText("Skład nie został jeszcze udostępniony.").assertIsDisplayed()
         rule.onNodeWithTag("football-pitch").assertDoesNotExist()
         screenshot("lineup-unavailable")
+    }
+
+    @Test fun playerSearchRestoresQueryAndFilterAndShowsMissingFieldsAndHistory() {
+        waitFor("Mecze dnia")
+        val search = rule.onNodeWithTag("team-search")
+        search.performClick().performTextInput("niko")
+        rule.onNodeWithTag("search-filter-2").performClick()
+        rule.onNodeWithTag("search-player-113").performScrollTo().performClick()
+        rule.onNodeWithTag("player-profile-113").assertIsDisplayed()
+        rule.onNodeWithTag("floating-navigation").assertDoesNotExist()
+        rule.onNodeWithText("Data urodzenia i wiek nie są dostępne.").assertIsDisplayed()
+        rule.onNodeWithText("Numer koszulki").assertDoesNotExist()
+        screenshot("player-missing-fields")
+        rule.onNodeWithTag("player-tab-1").performClick()
+        rule.onNodeWithText("Brak dostępnej historii występów.").assertIsDisplayed()
+        androidx.test.espresso.Espresso.pressBack()
+        rule.waitForIdle()
+        search.assertTextContains("niko")
+        rule.onNodeWithTag("search-filter-2").assertIsSelected()
+        rule.onNodeWithTag("search-player-113").assertExists()
+        search.performImeAction()
+        rule.onNodeWithTag("team-search-results").assertDoesNotExist()
+        click("Ligi")
+        click("Ekstraklasa")
+        click("Lech Poznań")
+        rule.onNodeWithTag("team-tab-3").performClick()
+        val teamList = rule.onNodeWithTag("team-list")
+        teamList.performScrollToNode(hasTestTag("player-913"))
+        val before = rule.onNodeWithTag("player-913").fetchSemanticsNode().boundsInRoot.top
+        rule.onNodeWithTag("player-913").performClick()
+        rule.onNodeWithTag("player-profile-913").assertIsDisplayed()
+        rule.onNodeWithTag("player-tab-1").performClick()
+        rule.onNodeWithTag("appearance-3").assertIsDisplayed()
+        rule.onNodeWithText("Wejście 63′").assertIsDisplayed()
+        rule.onNodeWithText("Gol 78′").assertIsDisplayed()
+        screenshot("player-appearance")
+        androidx.test.espresso.Espresso.pressBack()
+        rule.onNodeWithTag("team-tab-3").assertIsSelected()
+        org.junit.Assert.assertEquals(before, rule.onNodeWithTag("player-913").fetchSemanticsNode().boundsInRoot.top, 2f)
+    }
+
+    @Test fun matchEventsPitchBenchAndHistoryOpenTheSamePlayers() {
+        waitFor("Mecze dnia")
+        click("Mecze")
+        scrollClick("Lech Poznań")
+        val list = rule.onNodeWithTag("match-detail-list")
+        list.performScrollToNode(hasTestTag("event-player-913"))
+        rule.onNodeWithTag("event-player-913").performClick()
+        rule.onNodeWithTag("player-profile-913").assertIsDisplayed()
+        rule.onNodeWithTag("player-tab-1").performClick()
+        rule.onNodeWithTag("appearance-3").performClick()
+        list.performScrollToNode(hasTestTag("match-timeline-toggle"))
+        rule.onNodeWithTag("match-timeline-toggle").performClick()
+        list.performScrollToNode(hasTestTag("event-304"))
+        screenshot("match-timeline")
+        rule.onNode(hasTestTag("event-player-913") and hasAnyAncestor(hasTestTag("event-304"))).performClick()
+        rule.onNodeWithTag("player-profile-913").assertIsDisplayed()
+        androidx.test.espresso.Espresso.pressBack()
+        list.performScrollToNode(hasTestTag("match-pages"))
+        rule.onNodeWithTag("pitch-player-908").performScrollTo()
+        val pitchBefore = rule.onNodeWithTag("pitch-player-908").fetchSemanticsNode().boundsInRoot.top
+        rule.onNodeWithTag("pitch-player-908").performClick()
+        rule.onNodeWithTag("player-profile-908").assertIsDisplayed()
+        androidx.test.espresso.Espresso.pressBack()
+        org.junit.Assert.assertEquals(pitchBefore, rule.onNodeWithTag("pitch-player-908").fetchSemanticsNode().boundsInRoot.top, 2f)
+        repeat(6) {
+            if (!rule.onNodeWithTag("player-913").isDisplayed()) list.performTouchInput { swipeUp(durationMillis = 500) }
+        }
+        rule.onNodeWithTag("player-913").assertIsDisplayed()
+        screenshot("lineup-bench-events")
+        rule.onNodeWithTag("player-913").performTouchInput { click() }
+        rule.onNodeWithTag("player-profile-913").assertIsDisplayed()
+        androidx.test.espresso.Espresso.pressBack()
+        rule.onNodeWithTag("player-913").assertIsDisplayed()
+        screenshot("lineup-bench-events")
     }
 
     @Test fun matchDatesAndChronologicalOrder() {
@@ -151,9 +351,9 @@ class FootballUiTest {
         org.junit.Assert.assertEquals(note.center.y, prediction.center.y, 2f)
         org.junit.Assert.assertTrue(note.right < prediction.left)
         screenshot("match-compact-actions")
-        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("match-tab-1"))
+        rule.onNode(hasScrollToIndexAction() and androidx.compose.ui.test.SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.VerticalScrollAxisRange)).performScrollToNode(hasTestTag("match-tab-1"))
         rule.onNodeWithTag("match-tab-1").performClick()
-        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("standing-1"))
+        rule.onNode(hasScrollToIndexAction() and androidx.compose.ui.test.SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.VerticalScrollAxisRange)).performScrollToNode(hasTestTag("standing-1"))
         rule.onNodeWithTag("standing-1").assertIsSelected()
         rule.onNodeWithTag("standing-2").assertIsSelected()
         rule.onNodeWithTag("standing-3").assertIsNotSelected()
@@ -184,7 +384,7 @@ class FootballUiTest {
         click("Ekstraklasa")
         click("Legia Warszawa")
         rule.onNodeWithTag("team-tab-1").performClick()
-        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("standing-10"))
+        rule.onNode(hasScrollToIndexAction() and androidx.compose.ui.test.SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.VerticalScrollAxisRange)).performScrollToNode(hasTestTag("standing-10"))
         rule.onNodeWithTag("standing-10").assertIsSelected()
         rule.onNodeWithTag("standing-9").assertIsNotSelected()
         screenshot("team-table")
@@ -197,7 +397,7 @@ class FootballUiTest {
         rule.onNodeWithText("Mecze drużyny").assertExists()
     }
 
-    @Test fun navigationFloatsAcrossTabsAndDetailRoutes() {
+    @Test fun navigationFloatsOnMainScreensAndHidesOnDetails() {
         waitFor("Mecze dnia")
         fun assertFloating() {
             val bounds = rule.onNodeWithTag("floating-navigation").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
@@ -208,17 +408,20 @@ class FootballUiTest {
         listOf("Start", "Mecze", "Ulubione", "Moje", "Ligi").forEach {
             click(it)
             assertFloating()
+            click(it)
+            assertFloating()
+            rule.onNodeWithContentDescription(it).assertIsSelected()
         }
         screenshot("floating-leagues")
         click("La Liga")
-        assertFloating()
+        rule.onNodeWithTag("floating-navigation").assertDoesNotExist()
         click("Athletic Bilbao")
-        assertFloating()
+        rule.onNodeWithTag("floating-navigation").assertDoesNotExist()
         screenshot("floating-team")
         click("Mecze")
         click("Poprzedni dzień")
         scrollClick("Athletic Bilbao")
-        assertFloating()
+        rule.onNodeWithTag("floating-navigation").assertDoesNotExist()
         screenshot("floating-match")
         scrollClick("Dodaj notatkę")
         rule.onNodeWithTag("floating-navigation").assertDoesNotExist()
@@ -237,21 +440,21 @@ class FootballUiTest {
         org.junit.Assert.assertEquals(expandedHeight, header.fetchSemanticsNode().boundsInRoot.height, 2f)
         rule.onNodeWithTag("league-tab-0").assertIsDisplayed()
         screenshot("league-compact")
-        rule.onNodeWithTag("floating-navigation").assert(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.StateDescription, "Zwinięta"))
+        rule.onNodeWithTag("floating-navigation").assertDoesNotExist()
         rule.onNodeWithTag("league-list").performTouchInput { swipeDown(durationMillis = 600) }
         rule.waitForIdle()
         org.junit.Assert.assertEquals(expandedHeight, header.fetchSemanticsNode().boundsInRoot.height, 2f)
-        rule.onNodeWithTag("floating-navigation").assert(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.StateDescription, "Rozwinięta"))
+        rule.onNodeWithTag("floating-navigation").assertDoesNotExist()
         rule.onNodeWithTag("league-tab-1").performClick()
         rule.onNodeWithText("Athletic Bilbao").assertIsDisplayed()
         screenshot("league-matches")
         click("Athletic Bilbao")
         waitFor("Szczegóły meczu")
-        rule.onNode(hasScrollToIndexAction()).performTouchInput { swipeUp(durationMillis = 600) }
-        rule.onNodeWithTag("floating-navigation").assert(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.StateDescription, "Zwinięta"))
+        rule.onNode(hasScrollToIndexAction() and androidx.compose.ui.test.SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.VerticalScrollAxisRange)).performTouchInput { swipeUp(durationMillis = 600) }
+        rule.onNodeWithTag("floating-navigation").assertDoesNotExist()
         screenshot("match-navigation-compact")
-        rule.onNode(hasScrollToIndexAction()).performTouchInput { swipeDown(durationMillis = 600) }
-        rule.onNodeWithTag("floating-navigation").assert(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.StateDescription, "Rozwinięta"))
+        rule.onNode(hasScrollToIndexAction() and androidx.compose.ui.test.SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.VerticalScrollAxisRange)).performTouchInput { swipeDown(durationMillis = 600) }
+        rule.onNodeWithTag("floating-navigation").assertDoesNotExist()
     }
 
     @Test fun floatingNavigationFollowsScrollWithoutResizingList() {
@@ -262,10 +465,18 @@ class FootballUiTest {
             val bar = rule.onNodeWithTag("floating-navigation")
             bar.assert(androidx.compose.ui.test.SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.StateDescription, "Rozwinięta"))
             val viewport = list.fetchSemanticsNode().boundsInRoot
+            val expandedBounds = bar.fetchSemanticsNode().boundsInRoot
             screenshot("$tab-expanded")
             list.performTouchInput { swipeUp(durationMillis = 600) }
             rule.waitForIdle()
             bar.assert(androidx.compose.ui.test.SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.StateDescription, "Zwinięta"))
+            val compactBounds = bar.fetchSemanticsNode().boundsInRoot
+            org.junit.Assert.assertTrue(compactBounds.height < expandedBounds.height)
+            org.junit.Assert.assertTrue(compactBounds.width < expandedBounds.width)
+            listOf("Start", "Mecze", "Ligi", "Ulubione", "Moje").forEach { name ->
+                val bounds = rule.onNodeWithContentDescription(name).fetchSemanticsNode().boundsInRoot
+                org.junit.Assert.assertTrue(bounds.height / rule.activity.resources.displayMetrics.density >= 47.5f)
+            }
             org.junit.Assert.assertEquals(viewport, list.fetchSemanticsNode().boundsInRoot)
             screenshot("$tab-compact")
             val lastTeam = if (tab == "Start") "Athletic Bilbao" else "Real Madrid"

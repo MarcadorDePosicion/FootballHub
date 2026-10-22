@@ -25,7 +25,7 @@ import java.util.Locale
     }
     Surface(modifier, shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.surfaceVariant) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton({ filters.date = date.minusDays(1).toString() }) { Icon(HubIcons.Back, "Poprzedni dzień") }
+            IconButton({ filters.shiftDay(-1) }) { Icon(HubIcons.Back, "Poprzedni dzień") }
             Text(buildAnnotatedString {
                 if (relative != null) append(relative)
                 else {
@@ -36,7 +36,7 @@ import java.util.Locale
                 }
             }, Modifier.weight(1f), style = MaterialTheme.typography.labelSmall,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center, color = MaterialTheme.colorScheme.secondary)
-            IconButton({ filters.date = date.plusDays(1).toString() }) { Icon(HubIcons.Next, "Następny dzień") }
+            IconButton({ filters.shiftDay(1) }) { Icon(HubIcons.Next, "Następny dzień") }
         }
     }
 }

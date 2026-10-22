@@ -12,6 +12,7 @@ class MatchFilters(league: Int = 0, status: String = "ALL", query: String = "", 
 
     var date by mutableStateOf(date)
     var chronological by mutableStateOf(chronological)
+    fun shiftDay(step: Int) { date = java.time.LocalDate.parse(date).plusDays(step.toLong()).toString() }
 
     companion object {
         val Saver = listSaver<MatchFilters, Any>(
