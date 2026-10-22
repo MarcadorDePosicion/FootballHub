@@ -48,14 +48,15 @@ import pl.stasgroch.footballhub.ui.theme.hubHeaderGradient
     }
     Box(Modifier.fillMaxSize()) {
     Scaffold(
-        topBar = { if (route !in listOf("league/{id}", "team/{id}")) {
+        topBar = { if (route !in listOf("league/{id}", "team/{id}?player={player}")) {
             if (tabs.none { it.first == route }) {
                 Row(Modifier.fillMaxWidth().hubHeaderGradient().statusBarsPadding().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
                     IconButton({ nav.popBackStack() }) { Icon(HubIcons.Back, "Wstecz") }
+                    if (route == "match/{id}") Text("Szczegóły meczu", style = MaterialTheme.typography.titleLarge)
                 }
             } else {
             TopAppBar(title = {
-                HeaderSearch(state.data.teams) { teamId ->
+                HeaderSearch(state.data.teams, state.data.players, openPlayer = { player -> nav.navigate("team/${player.teamId}?player=${player.id}") }) { teamId ->
                     nav.navigate("team/$teamId")
                 }            }, navigationIcon = {
                 if (route !in tabs.map { it.first }) IconButton({ nav.popBackStack() }) { Icon(HubIcons.Back, "Wstecz") }
@@ -90,8 +91,8 @@ import pl.stasgroch.footballhub.ui.theme.hubHeaderGradient
                 composable("matches") { MatchesScreen(data, matchFilters, matchesList) { nav.navigate("match/$it") } }
                 composable("leagues") { LeaguesScreen(data) { nav.navigate("league/$it") } }
                 composable("league/{id}") { StandingsScreen(it.arguments?.getString("id")?.toIntOrNull() ?: -1, data, favorites, openMatch = { id -> nav.navigate("match/$id") }, back = { nav.popBackStack() }) { id -> nav.navigate("team/$id") } }
-                composable("team/{id}") {
-                    TeamScreen(it.arguments?.getString("id")?.toIntOrNull() ?: -1, data, { id -> nav.navigate("match/$id") }, openTeam = { id -> nav.navigate("team/$id") { launchSingleTop = true } }, back = { nav.popBackStack() }) { team ->
+                composable("team/{id}?player={player}") {
+                    TeamScreen(it.arguments?.getString("id")?.toIntOrNull() ?: -1, data, { id -> nav.navigate("match/$id") }, openTeam = { id -> nav.navigate("team/$id") { launchSingleTop = true } }, back = { nav.popBackStack() }, highlightedPlayerId = it.arguments?.getString("player")?.toIntOrNull()) { team ->
                         IconToggleButton(checked = team.id in favorites, onCheckedChange = { vm.favorite(team.id, it) }, enabled = !saving) {
                             Icon(if (team.id in favorites) HubIcons.StarFilled else HubIcons.Star,
                                 if (team.id in favorites) "Usuń z ulubionych" else "Dodaj do ulubionych",
@@ -100,7 +101,7 @@ import pl.stasgroch.footballhub.ui.theme.hubHeaderGradient
                     }
                 }
                 composable("match/{id}") {
-                    MatchDetailsScreen(it.arguments?.getString("id")?.toIntOrNull() ?: -1, data, { id -> nav.navigate("team/$id") }, { id -> nav.navigate("league/$id") }) { match ->
+                    MatchDetailsScreen(it.arguments?.getString("id")?.toIntOrNull() ?: -1, data, { id -> nav.navigate("team/$id") }, { id -> nav.navigate("league/$id") }, actions = { match ->
                         Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button({ nav.navigate("form/${match.id}/NOTE/new") }, Modifier.weight(1f).fillMaxHeight().heightIn(min = 48.dp),
                                 contentPadding = PaddingValues(horizontal = 8.dp), shape = MaterialTheme.shapes.medium) {
@@ -111,6 +112,7 @@ import pl.stasgroch.footballhub.ui.theme.hubHeaderGradient
                                 Text("Dodaj typ wyniku", style = MaterialTheme.typography.labelMedium)
                             }
                         }
+                    }) { match ->
                         val own = entries.filter { e -> e.matchId == match.id }
                         if (own.isEmpty()) EmptyState("Nie masz jeszcze wpisów do tego meczu.")
                         own.forEach { e -> EntryCard(e, { nav.navigate("form/${e.matchId}/${e.kind}/${e.id}") }, { vm.deleteEntry(e.id) }) }

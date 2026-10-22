@@ -74,6 +74,37 @@ class FootballUiTest {
         rule.onAllNodesWithText("FC Barcelona").onFirst().assertExists()
     }
 
+    @Test fun playerSearchRosterAndLineups() {
+        waitFor("Mecze dnia")
+        rule.onNodeWithTag("team-search").performClick().performTextInput("bruno")
+        rule.onNodeWithTag("search-filter-1").performClick()
+        rule.onNodeWithTag("search-player-101").assertDoesNotExist()
+        rule.onNodeWithTag("search-filter-2").performClick()
+        rule.onNodeWithTag("search-player-101").performClick()
+        rule.onNodeWithTag("team-tab-3").assertIsSelected()
+        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("player-101"))
+        rule.onNodeWithText("Bruno Baran").assertIsDisplayed()
+        screenshot("team-players")
+        click("Mecze")
+        scrollClick("Liverpool")
+        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("match-tab-0"))
+        rule.onNodeWithTag("match-tab-0").assertIsSelected()
+        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("football-pitch"))
+        rule.onNodeWithTag("football-pitch").assertExists()
+        rule.onNode(hasScrollToIndexAction()).performTouchInput { swipeUp(durationMillis = 500) }
+        screenshot("match-lineup")
+        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("lineup-away"))
+        rule.onNodeWithTag("lineup-away").performClick()
+        rule.onNodeWithText("4-3-3").assertExists()
+        click("Mecze")
+        click("Następny dzień")
+        scrollClick("Raków Częstochowa")
+        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("Skład nie został jeszcze udostępniony."))
+        rule.onNodeWithText("Skład nie został jeszcze udostępniony.").assertIsDisplayed()
+        rule.onNodeWithTag("football-pitch").assertDoesNotExist()
+        screenshot("lineup-unavailable")
+    }
+
     @Test fun matchDatesAndChronologicalOrder() {
         waitFor("Mecze dnia")
         click("Mecze")
@@ -120,6 +151,8 @@ class FootballUiTest {
         org.junit.Assert.assertEquals(note.center.y, prediction.center.y, 2f)
         org.junit.Assert.assertTrue(note.right < prediction.left)
         screenshot("match-compact-actions")
+        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("match-tab-1"))
+        rule.onNodeWithTag("match-tab-1").performClick()
         rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasTestTag("standing-1"))
         rule.onNodeWithTag("standing-1").assertIsSelected()
         rule.onNodeWithTag("standing-2").assertIsSelected()
@@ -191,7 +224,7 @@ class FootballUiTest {
         rule.onNodeWithTag("floating-navigation").assertDoesNotExist()
     }
 
-    @Test fun leagueHeaderCollapsesAndTabsOpenRealContent() {
+    @Test fun leagueHeaderStaysCompactAndTabsOpenRealContent() {
         waitFor("Mecze dnia")
         click("Ligi")
         click("La Liga")
@@ -201,7 +234,7 @@ class FootballUiTest {
         screenshot("league-expanded")
         rule.onNodeWithTag("league-list").performTouchInput { swipeUp(durationMillis = 600) }
         rule.waitForIdle()
-        org.junit.Assert.assertTrue(header.fetchSemanticsNode().boundsInRoot.height < expandedHeight - 20f)
+        org.junit.Assert.assertEquals(expandedHeight, header.fetchSemanticsNode().boundsInRoot.height, 2f)
         rule.onNodeWithTag("league-tab-0").assertIsDisplayed()
         screenshot("league-compact")
         rule.onNodeWithTag("floating-navigation").assert(SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.StateDescription, "Zwinięta"))

@@ -51,16 +51,18 @@ import java.time.LocalDate
         } else groupedMatches("filtered", filtered, data, openMatch)
     }
 }
-@Composable fun MatchDetailsScreen(id: Int, data: FootballData, openTeam: (Int) -> Unit, openLeague: (Int) -> Unit, content: @Composable ColumnScope.(Match) -> Unit = {}) {
+@Composable fun MatchDetailsScreen(id: Int, data: FootballData, openTeam: (Int) -> Unit, openLeague: (Int) -> Unit, actions: @Composable (Match) -> Unit = {}, content: @Composable ColumnScope.(Match) -> Unit = {}) {
     val match = data.matches.find { it.id == id }
     if (match == null) { EmptyState("Nie znaleziono meczu."); return }
     val home = data.team(match.homeId)
     val away = data.team(match.awayId)
+    var tab by rememberSaveable(id) { mutableIntStateOf(0) }
     LazyColumn(contentPadding = navigationListPadding(), verticalArrangement = Arrangement.spacedBy(HubSpace.md)) {
-        item { SectionTitle("Szczegóły meczu", "${displayDate(match.date)} • Kolejka ${match.round}") }
+        item { actions(match) }
         item {
             Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface) {
                 Column(Modifier.fillMaxWidth().padding(HubSpace.lg), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(HubSpace.lg)) {
+                    Text("${displayDate(match.date)} • Kolejka ${match.round}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(data.leagues.first { it.id == match.leagueId }.name, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(HubSpace.sm)) {
                         Column(Modifier.weight(1f).clickable(role = Role.Button, onClickLabel = "Otwórz profil drużyny", onClick = { openTeam(home.id) }).testTag("match-home-team"), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(HubSpace.sm)) { TeamEmblem(home, 48.dp)
@@ -82,6 +84,14 @@ import java.time.LocalDate
         }
         item { Column(verticalArrangement = Arrangement.spacedBy(HubSpace.sm)) { content(match) } }
         item {
+            SecondaryTabRow(tab) {
+                listOf("Składy", "Tabela").forEachIndexed { index, label ->
+                    Tab(tab == index, { tab = index }, text = { Text(label) }, modifier = Modifier.testTag("match-tab-$index"))
+                }
+            }
+        }
+        if (tab == 0) item { MatchLineups(match, data) } else {
+        item {
             TextButton({ openLeague(match.leagueId) }, Modifier.fillMaxWidth()) {
                 Text("Tabela ligi", style = MaterialTheme.typography.titleSmall)
                 Spacer(Modifier.weight(1f))
@@ -93,6 +103,7 @@ import java.time.LocalDate
             val rows = data.standings.filter { it.leagueId == match.leagueId }.sortedByDescending { it.points }
             if (rows.isEmpty()) EmptyState("Tabela tej ligi nie jest jeszcze dostępna.")
             else StandingsTable(rows, data, emptySet(), openTeam, highlightedTeamIds = setOf(home.id, away.id))
+        }
         }
     }
 }

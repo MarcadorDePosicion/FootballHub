@@ -13,14 +13,16 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import pl.stasgroch.footballhub.data.model.Team
+import pl.stasgroch.footballhub.data.model.Player
 
 @OptIn(ExperimentalMaterial3Api::class)
-@Composable fun HeaderSearch(teams: List<Team>, openTeam: (Int) -> Unit) {
+@Composable fun HeaderSearch(teams: List<Team>, players: List<Player> = emptyList(), openPlayer: (Player) -> Unit = {}, openTeam: (Int) -> Unit) {
     val keyboard = LocalSoftwareKeyboardController.current
     val focus = LocalFocusManager.current
     var query by remember { mutableStateOf("") }
     var expanded by remember { mutableStateOf(false) }
-    fun dismiss() { expanded = false; query = ""; focus.clearFocus(); keyboard?.hide() }
+    var filter by remember { mutableIntStateOf(0) }
+    fun dismiss() { expanded = false; query = ""; filter = 0; focus.clearFocus(); keyboard?.hide() }
     val matches = teams.filter { team ->
         val words = team.name.split(" ", "-")
         query.isBlank() || words.any { it.startsWith(query.trim(), ignoreCase = true) } || team.name.startsWith(query.trim(), true)
@@ -30,9 +32,9 @@ import pl.stasgroch.footballhub.data.model.Team
             modifier = Modifier.fillMaxWidth().menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable)
                 .onFocusChanged {
                     expanded = it.isFocused
-                    if (!it.isFocused) { query = ""; keyboard?.hide() }
+                    if (!it.isFocused) { query = ""; filter = 0; keyboard?.hide() }
                 }.testTag("team-search"),
-            placeholder = { Text("Szukaj drużyny", style = MaterialTheme.typography.bodySmall) },
+            placeholder = { Text("Szukaj w Football Hub", style = MaterialTheme.typography.bodySmall) },
             leadingIcon = { Icon(HubIcons.Search, null) },
             textStyle = MaterialTheme.typography.bodySmall,
             shape = MaterialTheme.shapes.extraLarge,
@@ -42,12 +44,25 @@ import pl.stasgroch.footballhub.data.model.Team
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { dismiss() }))
         ExposedDropdownMenu(expanded, onDismissRequest = { dismiss() }, modifier = Modifier.heightIn(max = 300.dp).testTag("team-search-results")) {
-            if (matches.isEmpty()) DropdownMenuItem(text = { Text("Brak drużyn") }, onClick = {}, enabled = false)
-            matches.forEach { team ->
+            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                listOf("Wszystkie", "Drużyna", "Zawodnik").forEachIndexed { index, label ->
+                    FilterChip(filter == index, { filter = index }, { Text(label, style = MaterialTheme.typography.labelSmall) }, modifier = Modifier.testTag("search-filter-$index"))
+                }
+            }
+            val foundPlayers = players.filter { player -> query.isBlank() || player.name.split(" ", "-").any { it.startsWith(query.trim(), true) } }
+            if ((filter == 2 || matches.isEmpty()) && (filter == 1 || foundPlayers.isEmpty()))
+                DropdownMenuItem(text = { Text("Brak wyników") }, onClick = {}, enabled = false)
+            if (filter != 2) matches.forEach { team ->
                 DropdownMenuItem(text = { Text(team.name, style = MaterialTheme.typography.bodyMedium) },
                     leadingIcon = { TeamEmblem(team, 28.dp) },
                     modifier = Modifier.testTag("search-team-${team.id}"),
                     onClick = { dismiss(); openTeam(team.id) })
+            }
+            if (filter != 1) foundPlayers.forEach { player ->
+                DropdownMenuItem(text = { Column {
+                    Text(player.name, style = MaterialTheme.typography.bodyMedium)
+                    Text(listOfNotNull(teams.find { it.id == player.teamId }?.name, if (player.demo) "DEMO" else null).joinToString(" • "), style = MaterialTheme.typography.labelSmall)
+                } }, modifier = Modifier.testTag("search-player-${player.id}"), onClick = { dismiss(); openPlayer(player) })
             }
         }
     }

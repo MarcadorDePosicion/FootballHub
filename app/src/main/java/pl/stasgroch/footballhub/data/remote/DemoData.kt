@@ -32,7 +32,21 @@ object DemoData {
             val rank = (it.id - 1) % 4
             Standing(it.leagueId, it.id, 8, 6-rank, 1, 1+rank, 19-rank*3, 6+rank*2)
         }
-        return FootballData(teams, listOf(League(1,"Premier League","Anglia"), League(2,"La Liga","Hiszpania"), League(3,"Ekstraklasa","Polska")), matches, standings)
+        val names = listOf("Adam Nowak", "Bruno Baran", "Carlos Silva", "Daniel Costa", "Emil Wolski", "Filip Marek",
+            "Gabriel Lima", "Hugo Martin", "Igor Lis", "Jan Bąk", "Kamil Król", "Leon Vidal", "Marek Alba", "Niko Barto")
+        val players = teams.flatMap { team -> names.mapIndexed { index, name ->
+            Player(team.id * 100 + index, team.id, name, if (index == 13) null else index + 1,
+                when (index) { 0, 11 -> PlayerPosition.GOALKEEPER; in 1..4, 12 -> PlayerPosition.DEFENDER
+                    in 5..7 -> PlayerPosition.MIDFIELDER; else -> PlayerPosition.FORWARD },
+                if (index == 13) null else "Polska", demo = true)
+        } }
+        // Deliberately omit the next day's lineups to exercise the unavailable state.
+        val lineups = matches.filter { it.id != 6 }.flatMap { match -> listOf(match.homeId, match.awayId).map { teamId ->
+            val base = teamId * 100
+            MatchLineup(match.id, teamId, "4-3-3", listOf(listOf(base), (1..4).map { base + it },
+                (5..7).map { base + it }, (8..10).map { base + it }), (11..13).map { base + it }, demo = true)
+        } }
+        return FootballData(teams, listOf(League(1,"Premier League","Anglia"), League(2,"La Liga","Hiszpania"), League(3,"Ekstraklasa","Polska")), matches, standings, players, lineups)
     }
 }
 

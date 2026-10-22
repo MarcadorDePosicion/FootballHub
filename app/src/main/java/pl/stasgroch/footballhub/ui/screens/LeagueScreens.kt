@@ -45,19 +45,18 @@ import pl.stasgroch.footballhub.ui.theme.HubSpace
     var tab by rememberSaveable(id) { mutableIntStateOf(0) }
     val tableState = rememberLazyListState()
     val matchesState = rememberLazyListState()
-    val behavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
-    Scaffold(modifier = Modifier.nestedScroll(behavior.nestedScrollConnection),
+    Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0), topBar = {
         Column {
-            MediumTopAppBar(
-                modifier = Modifier.hubGlass(RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp)).testTag("league-header"),
-                title = { Column(Modifier.padding(bottom = 8.dp)) {
+            TopAppBar(
+                modifier = Modifier.hubHeaderGradient().testTag("league-header"),
+                title = { Column {
                     Text(league.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text("${league.country}", style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } },
                 navigationIcon = { if (back != null) IconButton(back) { Icon(HubIcons.Back, "Wstecz") } },
-                scrollBehavior = behavior, windowInsets = WindowInsets(0, 0, 0, 0),
+                windowInsets = WindowInsets(0, 0, 0, 0),
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent,
                     scrolledContainerColor = Color.Transparent))
             SecondaryTabRow(selectedTabIndex = tab, containerColor = MaterialTheme.colorScheme.background) {
@@ -84,12 +83,13 @@ import pl.stasgroch.footballhub.ui.theme.HubSpace
         }
     }
 }
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable fun TeamScreen(id: Int, data: FootballData, openMatch: (Int) -> Unit,
-    openTeam: (Int) -> Unit = {}, back: () -> Unit = {}, favorite: @Composable (Team) -> Unit = {}) {
+    openTeam: (Int) -> Unit = {}, back: () -> Unit = {}, highlightedPlayerId: Int? = null, favorite: @Composable (Team) -> Unit = {}) {
     val team = data.teams.find { it.id == id }
     if (team == null) { EmptyState("Nie znaleziono drużyny."); return }
     val league = data.leagues.find { it.id == team.leagueId }
-    var tab by rememberSaveable(id) { mutableIntStateOf(0) }
+    var tab by rememberSaveable(id, highlightedPlayerId) { mutableIntStateOf(if (highlightedPlayerId != null) 3 else 0) }
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxWidth().hubHeaderGradient()) {
             IconButton(back) { Icon(HubIcons.Back, "Wstecz") }
@@ -103,8 +103,8 @@ import pl.stasgroch.footballhub.ui.theme.HubSpace
                 }
                 favorite(team)
             }
-            SecondaryTabRow(tab, containerColor = Color.Transparent) {
-                listOf("Mecze", "Tabela", "Informacje").forEachIndexed { index, label ->
+            SecondaryScrollableTabRow(tab, containerColor = Color.Transparent, edgePadding = 0.dp) {
+                listOf("Mecze", "Tabela", "Informacje", "Zawodnicy").forEachIndexed { index, label ->
                     Tab(tab == index, { tab = index }, text = { Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1) },
                         modifier = Modifier.testTag("team-tab-$index"))
                 }
@@ -113,6 +113,7 @@ import pl.stasgroch.footballhub.ui.theme.HubSpace
         key(id, tab) {
             LazyColumn(Modifier.weight(1f), contentPadding = navigationListPadding(), verticalArrangement = Arrangement.spacedBy(HubSpace.md)) {
                 when (tab) {
+                    3 -> playerRoster(data.players.filter { it.teamId == id }, highlightedPlayerId)
                     0 -> {
                         item { SectionTitle("Mecze drużyny") }
                         val matches = data.matches.filter { it.homeId == id || it.awayId == id }
