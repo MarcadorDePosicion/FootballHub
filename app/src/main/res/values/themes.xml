@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.FootballHub" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.FootballHub" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#0B1217</item>
+        <item name="android:colorBackground">#0B1217</item>
+    </style>
 </resources>

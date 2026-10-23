@@ -131,12 +131,14 @@ import pl.stasgroch.footballhub.data.model.*
             }
         }
         if (selected == 1) {
-            if (favoritePlayers.isEmpty() && favorites.isNotEmpty()) item { Text("Nie masz jeszcze ulubionych zawodników.") }
+            if (favoritePlayers.isEmpty() && favorites.isNotEmpty()) item {
+                EmptyState("Nie masz jeszcze ulubionych zawodników. Dodaj zawodnika gwiazdką na jego profilu.", HubIcons.Star)
+            }
             items(data.players.filter { it.id in favoritePlayers }, key = { "player-${it.id}" }) { player ->
                 Card(onClick = { openPlayer(player.id) }, modifier = Modifier.fillMaxWidth().testTag("favorite-player-${player.id}")) {
                     Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
-                            Text(player.name, style = MaterialTheme.typography.titleSmall)
+                            Text(player.name, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
                             data.teams.find { it.id == player.teamId }?.let { Text(it.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                         }
                         IconButton({ removePlayer(player.id) }) { Icon(HubIcons.StarFilled, "Usuń zawodnika z ulubionych", tint = MaterialTheme.colorScheme.primary) }
@@ -144,7 +146,9 @@ import pl.stasgroch.footballhub.data.model.*
                 }
             }
         }
-        if (selected == 0 && favorites.isEmpty() && favoritePlayers.isNotEmpty()) item { Text("Nie masz jeszcze ulubionych drużyn.") }
+        if (selected == 0 && favorites.isEmpty() && favoritePlayers.isNotEmpty()) item {
+            EmptyState("Nie masz jeszcze ulubionych drużyn. Dodaj drużynę gwiazdką na jej profilu.", HubIcons.Star)
+        }
         if (selected == 0) items(data.teams.filter { it.id in favorites }, key = { it.id }) { team ->
             Card(onClick = { openTeam(team.id) }, modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Column(Modifier.padding(12.dp)) {

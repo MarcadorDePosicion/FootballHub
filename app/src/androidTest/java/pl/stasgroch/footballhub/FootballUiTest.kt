@@ -16,6 +16,30 @@ import android.graphics.Bitmap
 
 class FootballUiTest {
     @get:Rule val rule = createAndroidComposeRule<MainActivity>()
+
+    @Test fun outgoingMainScreenKeepsItsBoundsDuringDetailTransition() {
+        waitFor("Mecze dnia")
+        val titleBefore = rule.onNodeWithText("Mecze dnia").fetchSemanticsNode().boundsInRoot
+        rule.mainClock.autoAdvance = false
+        try {
+            rule.onAllNodesWithText("Lech Poznań").onFirst().performClick()
+            rule.mainClock.advanceTimeBy(96)
+            org.junit.Assert.assertEquals(titleBefore, rule.onNodeWithText("Mecze dnia").fetchSemanticsNode().boundsInRoot)
+            rule.onNodeWithTag("team-search").assertExists()
+            val frame = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
+            try {
+                // Side gutter contains no cards/text: it must stay dark during crossfade.
+                val pixel = frame.getPixel(2, frame.height / 2)
+                org.junit.Assert.assertTrue("Transition exposed a light window background",
+                    android.graphics.Color.red(pixel) < 40 && android.graphics.Color.green(pixel) < 40 && android.graphics.Color.blue(pixel) < 40)
+            } finally { frame.recycle() }
+            rule.mainClock.advanceTimeBy(1000)
+        } finally { rule.mainClock.autoAdvance = true }
+        rule.onNodeWithTag("team-search").assertDoesNotExist()
+        androidx.test.espresso.Espresso.pressBack()
+        rule.onNodeWithText("Mecze dnia").assertIsDisplayed()
+        org.junit.Assert.assertEquals(titleBefore, rule.onNodeWithText("Mecze dnia").fetchSemanticsNode().boundsInRoot)
+    }
     private var arsenalWasFavorite = false
     private var playerWasFavorite = false
     @Before fun removePreviousTestEntries() = runBlocking {
