@@ -1,6 +1,6 @@
 # Football Hub
 
-Football Hub to aplikacja Android przygotowana jako projekt studencki z przedmiotu **Technologie Usługowe i Mobilne**. Umożliwia przeglądanie demonstracyjnych meczów i tabel ligowych, wyszukiwanie drużyn oraz prowadzenie lokalnego dziennika notatek i typów wyników.
+Football Hub to aplikacja Android przygotowana jako projekt studencki z przedmiotu **Technologie Usługowe i Mobilne**. Umożliwia przeglądanie demonstracyjnych meczów, tabel, składów i wydarzeń meczowych, wyszukiwanie drużyn i zawodników oraz prowadzenie lokalnego dziennika notatek i typów wyników.
 
 **Dane piłkarskie są przykładowe i pochodzą z lokalnego mocka. Aplikacja nie pobiera wyników na żywo.** Nie wymaga konta, klucza API ani uruchomienia backendu.
 
@@ -8,16 +8,29 @@ Football Hub to aplikacja Android przygotowana jako projekt studencki z przedmio
 
 - **Start** — mecze dnia, ostatnie wyniki i informacja o demonstracyjnym źródle danych.
 - **Mecze** — wybór dnia, filtrowanie według ligi i stanu spotkania (wszystkie, nadchodzące, zakończone), grupowanie według rozgrywek lub kolejność chronologiczna.
-- **Szczegóły meczu** — wynik lub godzina, stadion, kolejka, przejścia do profili drużyn oraz tabela ligi z wyróżnieniem obu uczestników.
+- **Szczegóły meczu** — data, wynik lub godzina, stadion, skrót strzelców oraz zakładki Szczegóły, Składy i Tabela. Nagłówek po przewinięciu pokazuje kompaktowy wynik i emblematy; tabela wyróżnia obu uczestników.
 - **Ligi** — lista rozgrywek oraz zakładki Tabela i Mecze; nagłówek ligi zwija się podczas przewijania.
-- **Profil drużyny** — zakładki Mecze, Tabela i Informacje, wyróżnienie drużyny w tabeli oraz dane o mieście, stadionie i roku założenia.
-- **Wyszukiwanie drużyn** — rozwijane podpowiedzi w nagłówku głównych ekranów; wybór otwiera profil, a dotknięcie poza polem zamyka wyszukiwanie.
-- **Ulubione** — dodawanie i usuwanie drużyn za pomocą gwiazdki, z lokalnym zapisem wyboru.
+- **Profil drużyny** — zakładki Mecze, Tabela, Informacje i Skład, wyróżnienie drużyny w tabeli, dane o mieście, stadionie i roku założenia oraz lista zawodników i trener, jeśli jest dostępny.
+- **Profil zawodnika** — klub, pozycja, numer, narodowość, data urodzenia i wiek, wzrost oraz preferowana noga w zakresie dostępnych danych. Braki nie są zastępowane zmyślonymi wartościami. Zakładka Mecze zawiera historię występów i niewykorzystanej ławki.
+- **Wyszukiwanie** — podpowiedzi drużyn i zawodników z filtrem rodzaju w nagłówku głównych ekranów. Wybór otwiera profil; powrót przywraca zapytanie i filtr. Dotknięcie poza polem zamyka i czyści wyszukiwanie. Wyszukiwanie meczów nie jest zaimplementowane.
+- **Ulubione** — drużyny i zawodnicy dodawani gwiazdką na profilu, z lokalnym zapisem. Oddzielne kategorie Drużyny i Zawodnicy mają karty pustego stanu. Przy całkowicie pustych ulubionych dostępny jest przycisk przeglądania lig.
 - **Moje** — tworzenie, odczyt, edycja i usuwanie notatek oraz typów wyników przypisanych do meczów. Wpisy są grupowane według spotkania i można je filtrować według rodzaju.
 
 Formularze sprawdzają m.in. pustą treść notatki, limit 2000 znaków oraz wyniki w zakresie 0–99. Usunięcie wpisu wymaga potwierdzenia. Zapisane wpisy i ulubione pozostają dostępne po ponownym uruchomieniu aplikacji.
 
+Na karcie zakończonego meczu ukryta jest akcja dodania typu; nadal można dodawać notatki i edytować wcześniej zapisane typy w Moje. To lokalny dziennik przewidywań, bez zawierania zakładów.
+
+### Składy, zdarzenia i historia zawodników
+
+- Składy gospodarzy i gości prezentują ustawienie na boisku, rezerwowych, dostępnego trenera i legendę. Brak ustawienia lub składu ma osobny komunikat albo listę dostępnych zawodników.
+- Szczegóły pokazują zdarzenia po stronie odpowiedniej drużyny: minutę, gola i wynik po golu, strzelca, asystenta, kartki oraz zmiany. Symbole oznaczają gola, asystę, samobójczą bramkę (czerwona piłka), żółtą/czerwoną kartkę oraz drugą żółtą skutkującą wykluczeniem (żółta z czerwoną).
+- Na boisku osiągnięcia nie przesuwają linii zawodników. Na ławce są obok nazwiska, a zmiany zawierają kolorową strzałkę, minutę i nazwisko zmienianego zawodnika; zejście jest czerwone.
+- Historia zawodnika ma kompaktowe wiersze drużyn i wyniku, wyróżnienie zwycięzcy, osiągnięcia oraz osobny znacznik minut gry lub niewykorzystanej ławki. Minuty są wyliczane z dostępnych danych występu i kompletnych zdarzeń; standardowy pełny mecz to 90 minut, bez doliczonego czasu. Nieznany czas nie jest udawany jako zero.
+- Zawodnika można otworzyć m.in. z wyszukiwarki, składu, strzelców i zdarzeń meczu. Wszystkie te dane są demonstracyjne.
+
 Interfejs wykorzystuje ciemny motyw, limonkowe i turkusowe akcenty, kompaktowe listy oraz pływającą dolną nawigację reagującą na przewijanie. Formularze ukrywają dolny pasek, pozostawiając miejsce na edycję. Efekt szkła opiera się na gradientach i półprzezroczystości, bez kosztownego rozmywania tła.
+
+Dni w Meczach i zakładki szczegółów można przesuwać poziomo. Ponowne dotknięcie aktywnej głównej zakładki przewija listę do góry, zachowując datę i filtry. Ekrany szczegółowe mają własne nagłówki i nie pokazują dolnej nawigacji. Pod przenikającymi ekranami pozostaje ciemne tło. Zakres sprawdzenia przejść i ograniczenia pomiarów opisuje [audyt animacji](docs/animation-audit-2026-10-23.md); nie jest to deklaracja płynności na każdym urządzeniu.
 
 ## Technologie i konfiguracja
 
@@ -98,13 +111,13 @@ Kod aplikacji znajduje się w `app/src/main/java/pl/stasgroch/footballhub`:
 
 Przepływ danych: **Compose → ViewModel → repozytorium → Retrofit/OkHttp lub Room**. Room publikuje zmiany przez Flow, dzięki czemu wpisy i ulubione są spójne między ekranami. Formularz wraca do poprzedniego widoku po zakończeniu zapisu.
 
-Notatki i typy mają identyfikatory UUID oraz identyfikator meczu. Ulubione są identyfikowane przez drużynę. Schemat bazy wersji 1 znajduje się w `app/schemas`; kolejne zmiany schematu wymagają migracji. Baza nie korzysta z destrukcyjnych migracji.
+Notatki i typy mają identyfikatory UUID oraz identyfikator meczu. Baza Room `football-hub.db` w wersji **2** zawiera tabele `entries`, `favorites` i `favorite_players`; ulubione przechowują identyfikatory drużyn lub zawodników. Schematy znajdują się w `app/schemas`. Migracja 1 → 2 dodaje ulubionych zawodników, zachowując wcześniejsze wpisy i drużyny. Baza nie korzysta z destrukcyjnych migracji. Jest lokalna: ponowne uruchomienie nie usuwa danych, natomiast wyczyszczenie danych aplikacji lub odinstalowanie je usuwa.
 
 ### Dane demonstracyjne i przyszły backend
 
 Retrofit wywołuje `GET /api/football`. `MockFootballInterceptor` przechwytuje żądanie i zwraca lokalną odpowiedź JSON. Nie wywołuje `chain.proceed()`, więc żądanie nie trafia do serwera. Użyty adres w domenie `.example` jest placeholderem i nie wymaga konfiguracji DNS ani klucza API.
 
-Przykładowe dane obejmują Premier League, La Ligę i Ekstraklasę. Nazwy klubów są rzeczywiste, lecz terminarz, wyniki i tabele są fikcyjne. Tabele zawierają fragmenty po cztery drużyny. Daty są generowane względem dnia utworzenia danych demonstracyjnych; identyfikatory pozostają stałe, dlatego zapisany wpis nadal odnosi się do tego samego demonstracyjnego meczu, nawet gdy zmieni się jego prezentowana data.
+Przykładowe dane obejmują Premier League, La Ligę i Ekstraklasę: 12 drużyn, 6 meczów i 168 fikcyjnych zawodników. Nazwy klubów są rzeczywiste, lecz terminarz, wyniki, tabele, kadry i zdarzenia są fikcyjne. Tabele zawierają fragmenty po cztery drużyny; nie są pełnymi tabelami rozgrywek. Część pól zawodników i skład następnego dnia są celowo niedostępne, aby pokazywać obsługę braków. Daty są generowane względem dnia utworzenia danych demonstracyjnych; identyfikatory pozostają stałe, dlatego zapisany wpis nadal odnosi się do tego samego demonstracyjnego meczu, nawet gdy zmieni się jego prezentowana data. Dane piłkarskie są tworzone ponownie przy ładowaniu demo; nie stanowią trwałego archiwum sezonu.
 
 Przyszłe podłączenie REST wymaga zastąpienia konfiguracji `FootballRepository.demo()`: usunięcia mock interceptora, ustawienia adresu backendu i zachowania kontraktu danych lub dodania mapowania DTO. Synchronizacja notatek, typów i ulubionych z serwerem wymaga osobnej implementacji w warstwie `UserRepository`; obecnie jej nie ma.
 
@@ -126,32 +139,36 @@ Na macOS i Linux zastąp `.\gradlew.bat` poleceniem `sh gradlew`. Testy jednostk
 | --- | --- |
 | `FootballDataTest` | JSON interceptora, spójność danych i walidacja formularzy |
 | `NavigationScrollStateTest` | Stan i próg zmiany wariantu dolnej nawigacji |
-| `RoomPersistenceTest` | Operacje CRUD i odtworzenie danych po ponownym otwarciu testowej bazy |
-| `FootballUiTest` | Nawigacja, wyszukiwanie i fokus, daty, filtry, profile, grupowanie wpisów, CRUD i ulubione |
+| `PlayerEventsTest`, `PlayedMinutesTest` | Spójność zdarzeń, powiązania z zawodnikami i wyliczanie minut gry |
+| `RoomPersistenceTest` | Operacje CRUD, odtworzenie danych i migracja schematu 1 → 2 |
+| `FootballUiTest` | Nawigacja, wyszukiwanie i powroty, daty, filtry, profile, gesty, CRUD, anulowanie edycji i ulubione; wybrane klatki przejść i geometria |
+| `LineupLayoutTest` | Stałe pozycje linii i wysokość przy przełączaniu stron, brak formacji i pusty skład |
+| `FavoritesLayoutTest` | Puste kategorie przy posiadaniu tylko drużyny albo tylko zawodnika |
 | `StandingsLayoutTest` | Układ tabeli przy szerokości 320 dp i czcionce 150%, przewijanie oraz przejścia do drużyn |
 
 Repozytorium zawiera także podstawowe testy z szablonu Android Studio. Testy UI tworzą i sprzątają własne wpisy; test Room korzysta z oddzielnej bazy testowej.
 
 Raporty są generowane w `app/build/reports/`, m.in. `tests/testDebugUnitTest/`, `androidTests/connected/debug/` oraz `lint-results-debug.html`. Wybrane testy UI zapisują zrzuty na urządzeniu w `/sdcard/Download/footballhub-ui`. Raporty i zrzuty są wynikami lokalnego uruchomienia, a nie warunkiem pobrania projektu.
 
-### Ostatni udokumentowany wynik — 21.10.2026
+### Ostatni udokumentowany wynik — 23.10.2026
 
-W poprzednim etapie prac odnotowano:
+Po poprawce zachowania wyszukiwarki wykonano kompilację, testy i lint:
 
 - `assembleDebug`, `testDebugUnitTest`, `connectedDebugAndroidTest` i `lintDebug`: **BUILD SUCCESSFUL**;
-- **4 testy JVM i 11 testów urządzeniowych**, bez błędów;
-- testy na emulatorze Pixel 8 z Androidem 16; model ten opisuje środowisko historycznej weryfikacji, a nie wymaganie aplikacji;
-- ocenę wybranych zrzutów UI, w tym pogrupowanych wpisów oraz kart ulubionych, przy czcionce 130%.
+- **11 testów JVM i 27 testów Android**, bez błędów i pominięć;
+- emulator Pixel 8 z Androidem 16 — środowisko weryfikacji, nie wymaganie aplikacji;
+- lint: **0 błędów, 22 ostrzeżenia** dotyczące nowszych zależności, nieużywanych zasobów szablonu i nadmiarowej etykiety manifestu;
+- oględziny zapisanych klatek przejścia Ligi ↔ liga oraz testy geometrii i ciemnego tła w trakcie wybranych przejść.
 
-Przy tej redakcji README nie uruchamiano ponownie kompilacji ani testów. Powyższe wyniki są historyczne i nie potwierdzają działania na każdym urządzeniu. Wcześniej odnotowano ostrzeżenia lint o dostępności nowszych zależności i zasobach szablonu. Nie przeprowadzono pomiaru wydajności gwarantującego stałe 60 FPS.
+README zaktualizowano po zakończeniu implementacji i testów. Wyniki nie potwierdzają działania na każdym urządzeniu ani poprawności każdej klatki wszystkich tras. Nie wykonano benchmarku czasu klatek, pomiaru rekompozycji ani testów wydajności na fizycznym telefonie. Szczegółowy zakres oraz odtworzony przed poprawką błąd wyszukiwarki opisuje [raport audytu](docs/animation-audit-2026-10-23.md).
 
 ### Krótki scenariusz demonstracji
 
 1. Pokaż Start i oznaczenie danych demonstracyjnych; otwórz szczegóły meczu oraz profil drużyny.
 2. W Meczach zmień dzień, ligę, stan i kolejność. Sprawdź również dzień bez spotkań.
-3. Wyszukaj drużynę, zawęź podpowiedzi kolejnymi literami i otwórz profil. Sprawdź zamknięcie wyników i klawiatury po dotknięciu poza polem.
-4. Przełącz zakładki ligi i drużyny; sprawdź wyróżnienia w tabeli oraz zwijanie nagłówka i dolnej nawigacji.
-5. Dodaj drużynę do Ulubionych i usuń ją gwiazdką z listy.
+3. Wyszukaj drużynę i zawodnika, użyj filtrów, otwórz profile i wróć do zapytania. Sprawdź zamknięcie wyników i klawiatury po dotknięciu poza polem.
+4. Przełącz zakładki ligi, drużyny, zawodnika i meczu. Obejrzyj zdarzenia, boisko, obie ławki i historię występów; sprawdź wyróżnienia w tabeli oraz zwijanie nagłówka i dolnej nawigacji.
+5. Dodaj drużynę i zawodnika do Ulubionych; przełącz kategorie, usuń elementy gwiazdką i sprawdź puste stany.
 6. Dodaj notatkę i typ do jednego meczu, sprawdź wspólny nagłówek w Moje, edycję, walidację oraz anulowanie i potwierdzenie usunięcia.
 7. Obróć ekran podczas edycji, a następnie zamknij i uruchom aplikację ponownie, aby sprawdzić trwałość zapisanych danych. Sprawdź też działanie mocka bez sieci.
 

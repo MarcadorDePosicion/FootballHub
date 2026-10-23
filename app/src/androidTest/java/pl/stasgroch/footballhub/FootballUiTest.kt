@@ -17,6 +17,62 @@ import android.graphics.Bitmap
 class FootballUiTest {
     @get:Rule val rule = createAndroidComposeRule<MainActivity>()
 
+    @Test fun teamSearchRestoresQueryAndFilterOnReturn() {
+        waitFor("Mecze dnia")
+        rule.onNodeWithTag("team-search").performClick().performTextInput("barcelona")
+        rule.onNodeWithTag("search-filter-1").performClick()
+        rule.onNodeWithTag("search-team-5").performClick()
+        rule.onNodeWithTag("team-tab-0").assertIsDisplayed()
+        androidx.test.espresso.Espresso.pressBack()
+        rule.onNodeWithTag("team-search").assertTextContains("barcelona")
+        rule.onNodeWithTag("search-filter-1").assertIsSelected()
+        rule.onNodeWithTag("search-team-5").assertIsDisplayed()
+    }
+
+    @Test fun leagueTransitionFramesKeepGeometryAndDarkBackgroundBothWays() {
+        waitFor("Mecze dnia")
+        click("Ligi")
+        val before = rule.onNodeWithText("Rozgrywki").fetchSemanticsNode().boundsInRoot
+        rule.mainClock.autoAdvance = false
+        try {
+            rule.onNodeWithText("La Liga").performClick()
+            repeat(3) {
+                rule.mainClock.advanceTimeBy(64)
+                org.junit.Assert.assertEquals(before, rule.onNodeWithText("Rozgrywki").fetchSemanticsNode().boundsInRoot)
+                assertDarkTransitionFrame("league-enter-$it")
+            }
+            rule.mainClock.advanceTimeBy(1000)
+        } finally { rule.mainClock.autoAdvance = true }
+        val detail = rule.onNodeWithText("La Liga").fetchSemanticsNode().boundsInRoot
+        rule.mainClock.autoAdvance = false
+        try {
+            rule.onNodeWithContentDescription("Wstecz").performClick()
+            repeat(3) {
+                rule.mainClock.advanceTimeBy(64)
+                val titles = rule.onAllNodesWithText("La Liga").fetchSemanticsNodes()
+                org.junit.Assert.assertTrue(titles.any { it.boundsInRoot == detail })
+                assertDarkTransitionFrame("league-return-$it")
+            }
+            rule.mainClock.advanceTimeBy(1000)
+        } finally { rule.mainClock.autoAdvance = true }
+        rule.onNodeWithText("Rozgrywki").assertIsDisplayed()
+    }
+
+    private fun assertDarkTransitionFrame(name: String) {
+        rule.waitForIdle()
+        val frame = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
+        try {
+            val pixel = frame.getPixel(2, frame.height / 2)
+            org.junit.Assert.assertTrue("Light background in $name", android.graphics.Color.red(pixel) < 40 &&
+                android.graphics.Color.green(pixel) < 40 && android.graphics.Color.blue(pixel) < 40)
+            val output = File(InstrumentationRegistry.getInstrumentation().targetContext.getExternalFilesDir(null), "$name.png")
+            output.outputStream().use { frame.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+            automation.executeShellCommand("mkdir -p /sdcard/Download/footballhub-ui").use { FileInputStream(it.fileDescriptor).readBytes() }
+            automation.executeShellCommand("cp ${output.absolutePath} /sdcard/Download/footballhub-ui/$name.png").use { FileInputStream(it.fileDescriptor).readBytes() }
+        } finally { frame.recycle() }
+    }
+
     @Test fun outgoingMainScreenKeepsItsBoundsDuringDetailTransition() {
         waitFor("Mecze dnia")
         val titleBefore = rule.onNodeWithText("Mecze dnia").fetchSemanticsNode().boundsInRoot
@@ -105,6 +161,9 @@ class FootballUiTest {
         screenshot("favorite-players")
         rule.onNodeWithTag("favorite-player-101").performClick()
         rule.onNodeWithTag("player-profile-101").assertIsDisplayed()
+        androidx.test.espresso.Espresso.pressBack()
+        rule.onNodeWithTag("favorites-tab-1").assertIsSelected()
+        rule.onNodeWithTag("favorite-player-101").assertIsDisplayed()
         click("Ulubione")
         rule.onNodeWithTag("favorites-tab-1").performClick()
         click("Usuń zawodnika z ulubionych")
@@ -582,6 +641,11 @@ class FootballUiTest {
         click("Moje")
         waitFor("Test UI: pressing")
         entryAction("Test UI: pressing", "Edytuj")
+        rule.onNodeWithText("Treść notatki").performTextReplacement("Test UI: anulowana")
+        rule.onNodeWithText("Anuluj").performScrollTo().performClick()
+        waitFor("Test UI: pressing")
+        rule.onNodeWithText("Test UI: anulowana").assertDoesNotExist()
+        entryAction("Test UI: pressing", "Edytuj")
         rule.onNodeWithText("Treść notatki").performTextReplacement("Test UI: wysoki pressing")
         rule.onNodeWithText("Zapisz").performScrollTo().performClick()
         waitFor("Test UI: wysoki pressing")
@@ -595,6 +659,11 @@ class FootballUiTest {
         click("Moje")
         click("Typy")
         waitFor("2 : 1")
+        entryAction("Test UI: typ", "Edytuj")
+        rule.onNodeWithText("ARS").performTextReplacement("9")
+        rule.onNodeWithContentDescription("Wstecz").performClick()
+        waitFor("2 : 1")
+        rule.onNodeWithText("9 : 1").assertDoesNotExist()
         entryAction("Test UI: typ", "Edytuj")
         rule.onNodeWithText("ARS").performTextReplacement("3")
         rule.onNodeWithText("Zapisz").performScrollTo().performClick()

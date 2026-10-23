@@ -75,7 +75,7 @@ class HeaderSearchState(query: String = "", filter: Int = 0, resume: Boolean = f
                 DropdownMenuItem(text = { Text(team.name, style = MaterialTheme.typography.bodyMedium) },
                     leadingIcon = { TeamEmblem(team, 28.dp) },
                     modifier = Modifier.testTag("search-team-${team.id}"),
-                    onClick = { dismiss(); openTeam(team.id) })
+                    onClick = { search.resume = true; expanded = false; keyboard?.hide(); openTeam(team.id) })
             }
             if (filter != 1) foundPlayers.forEach { player ->
                 DropdownMenuItem(text = { Column {
