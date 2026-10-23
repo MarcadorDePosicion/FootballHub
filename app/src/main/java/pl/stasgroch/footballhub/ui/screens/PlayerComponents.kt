@@ -17,21 +17,34 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import pl.stasgroch.footballhub.data.model.*
 
-@Composable fun PlayerRow(player: Player, highlighted: Boolean = false, openPlayer: (Int) -> Unit = {}, events: List<MatchEvent> = emptyList()) {
+@Composable fun PlayerRow(player: Player, highlighted: Boolean = false, openPlayer: (Int) -> Unit = {}, events: List<MatchEvent> = emptyList(), players: List<Player> = emptyList()) {
     Surface(color = if (highlighted) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
         shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth().clickable(role = Role.Button, onClickLabel = "Otwórz profil zawodnika") { openPlayer(player.id) }.testTag("player-${player.id}")) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(player.number?.toString() ?: "—", Modifier.width(28.dp), color = MaterialTheme.colorScheme.secondary, textAlign = TextAlign.Center)
             Column(Modifier.weight(1f)) {
-                Text(player.name, style = MaterialTheme.typography.bodyMedium)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(player.name, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                    PlayerAchievements(player.id, events)
+                }
                 Text(listOfNotNull(player.position?.label, player.nationality).joinToString(" • ").ifBlank { "Brak informacji o pozycji i narodowości" },
                     style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                events.filter { it.involves(player.id) }.forEach {
-                    Text(it.playerSummary(player.id), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                events.filter { it.kind == EventKind.SUBSTITUTION && it.involves(player.id) }.forEach { event ->
+                    val entering = event.incomingPlayerId == player.id
+                    val otherId = if (entering) event.playerId else event.incomingPlayerId
+                    val other = players.find { it.id == otherId }?.name ?: "Zawodnik"
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("${if (entering) "↑" else "↓"} ${event.time.label}", style = MaterialTheme.typography.labelSmall,
+                            color = if (entering) MaterialTheme.colorScheme.primary else Color(0xFFFF7979))
+                        Text("${if (entering) "Schodzi" else "Wchodzi"}: $other", style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
         }
@@ -58,14 +71,34 @@ fun LazyListScope.playerRoster(players: List<Player>, highlightedId: Int? = null
 @Composable fun MatchLineups(match: Match, data: FootballData, openPlayer: (Int) -> Unit = {}) {
     val events = data.eventsFor(match.id)
     var away by rememberSaveable(match.id) { mutableStateOf(false) }
-    val teamId = if (away) match.awayId else match.homeId
-    val team = data.team(teamId)
-    val lineup = data.lineups.find { it.matchId == match.id && it.teamId == teamId }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FilterChip(!away, { away = false }, { Text("Gospodarze") }, modifier = Modifier.weight(1f).testTag("lineup-home"))
             FilterChip(away, { away = true }, { Text("Goście") }, modifier = Modifier.weight(1f).testTag("lineup-away"))
         }
+        // Measure both teams before placement. A shorter bench must not shrink the
+        // enclosing pager and make LazyColumn clamp its current scroll position.
+        Layout(modifier = Modifier.testTag("lineup-sides"), content = {
+            listOf(match.homeId, match.awayId).forEach { teamId ->
+                val visible = teamId == if (away) match.awayId else match.homeId
+                Column(Modifier.then(if (visible) Modifier else Modifier.clearAndSetSemantics { }),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    LineupTeam(match, data, teamId, events, openPlayer)
+                }
+            }
+        }) { measurables, constraints ->
+            val sides = measurables.map { it.measure(constraints.copy(minHeight = 0)) }
+            layout(sides.maxOf { it.width }, sides.maxOf { it.height }) {
+                sides[if (away) 1 else 0].placeRelative(0, 0)
+            }
+        }
+    }
+}
+
+@Composable private fun LineupTeam(match: Match, data: FootballData, teamId: Int,
+    events: List<MatchEvent>, openPlayer: (Int) -> Unit) {
+    val team = data.team(teamId)
+    val lineup = data.lineups.find { it.matchId == match.id && it.teamId == teamId }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             TeamEmblem(team, 32.dp)
             Text(team.name, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
@@ -79,7 +112,7 @@ fun LazyListScope.playerRoster(players: List<Player>, highlightedId: Int? = null
             if (lineup.hasValidFormation() && rows.flatten().size == 11) FootballPitch(rows, events, openPlayer)
             else {
                 Text("Brak pełnego ustawienia — prezentujemy dostępnych zawodników.", style = MaterialTheme.typography.bodySmall)
-                rows.flatten().distinctBy { it.id }.forEach { PlayerRow(it, openPlayer = openPlayer, events = events) }
+                rows.flatten().distinctBy { it.id }.forEach { PlayerRow(it, openPlayer = openPlayer, events = events, players = data.players) }
             }
             lineup.coach?.let { coach ->
                 Surface(shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
@@ -92,10 +125,9 @@ fun LazyListScope.playerRoster(players: List<Player>, highlightedId: Int? = null
             Text("Rezerwowi", style = MaterialTheme.typography.titleSmall)
             val bench = lineup.substitutes.orEmpty().mapNotNull { id -> data.players.find { it.id == id } }
             if (bench.isEmpty()) Text("Lista rezerwowych nie jest dostępna.", style = MaterialTheme.typography.bodySmall)
-            bench.forEach { PlayerRow(it, openPlayer = openPlayer, events = events) }
+            bench.forEach { PlayerRow(it, openPlayer = openPlayer, events = events, players = data.players) }
             if (events.isNotEmpty()) EventLegend()
         }
-    }
 }
 
 @Composable private fun FootballPitch(rows: List<List<Player>>, events: List<MatchEvent>, openPlayer: (Int) -> Unit) {
@@ -125,7 +157,7 @@ fun LazyListScope.playerRoster(players: List<Player>, highlightedId: Int? = null
                             PlayerAchievements(player.id, events)
                             val marks = events.firstOrNull { it.kind == EventKind.SUBSTITUTION && it.involves(player.id) }?.let { "${if (it.incomingPlayerId == player.id) "↑" else "↓"}${it.time.label}" }.orEmpty()
                             if (marks.isNotBlank()) Text(marks, Modifier.fillMaxWidth(), textAlign = TextAlign.Center,
-                                style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                                style = MaterialTheme.typography.labelSmall, color = if (marks.startsWith("↓")) Color(0xFFFF7979) else MaterialTheme.colorScheme.primary)
                         }
                     }
                 }

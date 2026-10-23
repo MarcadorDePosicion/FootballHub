@@ -68,7 +68,8 @@ import pl.stasgroch.footballhub.data.model.*
                 LegendItem("Żółta kartka") { CardSymbol(CardKind.YELLOW) }
                 LegendItem("Druga żółta / czerwona") { CardSymbol(CardKind.SECOND_YELLOW) }
                 LegendItem("Czerwona kartka") { CardSymbol(CardKind.RED) }
-                LegendItem("Wejście / zejście") { Text("↑ / ↓", color = MaterialTheme.colorScheme.primary) }
+                LegendItem("Wejście") { Text("↑", color = MaterialTheme.colorScheme.primary) }
+                LegendItem("Zejście") { Text("↓", color = Color(0xFFFF7979)) }
             }
         }
     }

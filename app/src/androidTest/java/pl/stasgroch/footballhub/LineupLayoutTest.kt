@@ -28,10 +28,18 @@ class LineupLayoutTest {
         } }
         val home = data.lineups.first { it.matchId == 3 && it.teamId == match.homeId }.starterRows!!.flatten()
         val homePositions = home.map { rule.onNodeWithTag("pitch-player-$it").fetchSemanticsNode().boundsInRoot.top }
+        val heightBefore = rule.onNodeWithTag("lineup-sides").fetchSemanticsNode().size.height
         rule.onNodeWithTag("lineup-away").performClick()
+        assertEquals(heightBefore, rule.onNodeWithTag("lineup-sides").fetchSemanticsNode().size.height)
         val away = data.lineups.first { it.matchId == 3 && it.teamId == match.awayId }.starterRows!!.flatten()
         away.forEachIndexed { index, id ->
             assertEquals(homePositions[index], rule.onNodeWithTag("pitch-player-$id").fetchSemanticsNode().boundsInRoot.top, 1f)
+        }
+        repeat(3) {
+            rule.onNodeWithTag("lineup-home").performClick()
+            assertEquals(heightBefore, rule.onNodeWithTag("lineup-sides").fetchSemanticsNode().size.height)
+            rule.onNodeWithTag("lineup-away").performClick()
+            assertEquals(heightBefore, rule.onNodeWithTag("lineup-sides").fetchSemanticsNode().size.height)
         }
     }
 

@@ -25,7 +25,6 @@ import pl.stasgroch.footballhub.data.model.*
                     Text(data.team(id).name, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall,
                         fontWeight = if (won) FontWeight.Bold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis,
                         color = if (won) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
-                    if (id == teamId && !unusedBench) PlayerAchievements(playerId, data.eventsFor(match.id))
                 }
             }
             }
@@ -35,6 +34,13 @@ import pl.stasgroch.footballhub.data.model.*
                         val minutes = data.appearances.find { it.matchId == match.id && it.playerId == playerId }
                             ?.playedMinutes(data.matchEvents.find { it.matchId == match.id }, match.status == "FINISHED")
                         Text(minutes?.let { "$it′" } ?: "—", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp), horizontalAlignment = Alignment.End) {
+                listOf(match.homeId, match.awayId).forEach { id ->
+                    Box(Modifier.heightIn(min = 28.dp), contentAlignment = Alignment.CenterEnd) {
+                        if (id == teamId && !unusedBench) PlayerAchievements(playerId, data.eventsFor(match.id))
                     }
                 }
             }
