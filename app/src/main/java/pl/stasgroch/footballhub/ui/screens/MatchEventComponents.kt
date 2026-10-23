@@ -19,11 +19,11 @@ private fun shortName(name: String): String {
 }
 
 @Composable fun PlayerLink(id: Int?, data: FootballData, openPlayer: (Int) -> Unit,
-    muted: Boolean = false, suffix: String = "", align: TextAlign = TextAlign.Start) {
+    muted: Boolean = false, suffix: String = "", align: TextAlign = TextAlign.Start, compact: Boolean = false) {
     val player = data.players.find { it.id == id }
     Text((player?.let { shortName(it.name) } ?: "Zawodnik nieznany") + suffix,
         modifier = Modifier.then(if (player != null) Modifier.clickable(role = Role.Button,
-            onClickLabel = "Profil: ${player.name}") { openPlayer(player.id) }.testTag("event-player-${player.id}") else Modifier).padding(vertical = 6.dp),
+            onClickLabel = "Profil: ${player.name}") { openPlayer(player.id) }.testTag("event-player-${player.id}") else Modifier).padding(vertical = if (compact) 1.dp else 6.dp),
         style = MaterialTheme.typography.bodySmall, textAlign = align,
         color = if (muted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface)
 }
@@ -34,15 +34,16 @@ private fun shortName(name: String): String {
     Column {
         if (data.matchEvents.find { it.matchId == match.id }?.demo == true)
             Text("DEMO • strzelcy", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf(match.homeId, match.awayId).forEach { teamId ->
+                if (teamId == match.awayId) FootballSymbol()
                 val away = teamId == match.awayId
                 Column(Modifier.weight(1f), horizontalAlignment = if (away) Alignment.End else Alignment.Start) {
                     goals.filter { it.teamId == teamId }.groupBy { it.playerId }.forEach { (id, scored) ->
                         val minutes = scored.joinToString(", ") { goal -> goal.time.label + when (goal.goalKind) {
                             GoalKind.PENALTY -> " (k.)"; GoalKind.OWN_GOAL -> " (s.)"; else -> ""
                         } }
-                        PlayerLink(id, data, openPlayer, muted = true, suffix = " $minutes", align = if (away) TextAlign.End else TextAlign.Start)
+                        PlayerLink(id, data, openPlayer, muted = true, suffix = " $minutes", align = if (away) TextAlign.End else TextAlign.Start, compact = true)
                     }
                 }
             }
@@ -104,10 +105,9 @@ private fun shortName(name: String): String {
 
 @Composable private fun EventSymbol(event: MatchEvent) {
     when (event.kind) {
-        EventKind.GOAL -> Text("⚽", style = MaterialTheme.typography.bodyMedium)
+        EventKind.GOAL -> FootballSymbol(event.goalKind == GoalKind.OWN_GOAL)
         EventKind.SUBSTITUTION -> Text("⇄", color = MaterialTheme.colorScheme.secondary)
-        EventKind.CARD -> Text(if (event.cardKind == CardKind.SECOND_YELLOW) "▮▮" else "▮",
-            color = if (event.cardKind == CardKind.RED) Color(0xFFFF7979) else Color(0xFFFFD65A))
+        EventKind.CARD -> CardSymbol(event.cardKind ?: CardKind.YELLOW)
     }
 }
 
@@ -118,7 +118,7 @@ fun playerEventMarks(playerId: Int, events: List<MatchEvent>): String {
         own.count { it.kind == EventKind.GOAL && it.playerId == playerId && it.goalKind != GoalKind.OWN_GOAL }.takeIf { it > 0 }?.let { "G×$it" },
         own.count { it.assistPlayerId == playerId }.takeIf { it > 0 }?.let { "A×$it" },
         own.find { it.kind == EventKind.GOAL && it.playerId == playerId && it.goalKind == GoalKind.OWN_GOAL }?.let { "GS" },
-        own.filter { it.kind == EventKind.CARD }.lastOrNull()?.let { when (it.cardKind) { CardKind.YELLOW -> "ŻK"; CardKind.SECOND_YELLOW -> "2ŻK"; CardKind.RED -> "CK"; null -> "K" } },
+        own.filter { it.kind == EventKind.CARD }.lastOrNull()?.let { when (it.cardKind) { CardKind.YELLOW -> "ŻK"; CardKind.SECOND_YELLOW -> "2ŻK → CK"; CardKind.RED -> "CK"; null -> "K" } },
         own.find { it.kind == EventKind.SUBSTITUTION }?.let { "${if (it.incomingPlayerId == playerId) "↑" else "↓"}${it.time.label}" }
     ).joinToString(" · ")
 }

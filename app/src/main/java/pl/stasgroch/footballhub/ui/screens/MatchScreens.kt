@@ -98,15 +98,18 @@ import java.time.LocalDate
                     MatchStatus(match.status)
                 }
                 TeamEmblem(away, 32.dp)
-            } else Text("Szczegóły meczu", style = MaterialTheme.typography.titleLarge)
+            } else Text("Szczegóły meczu", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
+            Spacer(Modifier.width(48.dp))
         }
     LazyColumn(state = list, modifier = Modifier.weight(1f).testTag("match-detail-list"), contentPadding = detailListPadding(), verticalArrangement = Arrangement.spacedBy(HubSpace.sm)) {
         item {
             Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface) {
                 Column(Modifier.fillMaxWidth().padding(HubSpace.lg), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(HubSpace.sm)) {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text("${displayDate(match.date)} • Kolejka ${match.round}", Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        actions(match)
+                    Box(Modifier.fillMaxWidth().heightIn(min = 48.dp), contentAlignment = Alignment.Center) {
+                        Surface(modifier = Modifier.padding(horizontal = if (match.status == "FINISHED") 48.dp else 88.dp), shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceVariant) {
+                            Text("${displayDate(match.date)} • ${match.time}", Modifier.padding(horizontal = 8.dp, vertical = 6.dp), style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center)
+                        }
+                        Row(Modifier.align(Alignment.CenterEnd)) { actions(match) }
                     }
                     Text(data.leagues.first { it.id == match.leagueId }.name, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(HubSpace.sm)) {

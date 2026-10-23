@@ -17,13 +17,16 @@ import android.graphics.Bitmap
 class FootballUiTest {
     @get:Rule val rule = createAndroidComposeRule<MainActivity>()
     private var arsenalWasFavorite = false
+    private var playerWasFavorite = false
     @Before fun removePreviousTestEntries() = runBlocking {
         val dao = FootballDatabase.get(rule.activity).userDao()
+        playerWasFavorite = dao.favoritePlayers().first().any { it.playerId == 101 }
         arsenalWasFavorite = dao.favorites().first().any { it.teamId == 1 }
         dao.entries().first().filter { it.text.startsWith("Test UI:") }.forEach { dao.delete(it.id) }
     }
     @org.junit.After fun restoreFavorite() = runBlocking {
         val dao = FootballDatabase.get(rule.activity).userDao()
+        if (playerWasFavorite) dao.addFavoritePlayer(pl.stasgroch.footballhub.data.local.FavoritePlayerEntity(101)) else dao.removeFavoritePlayer(101)
         if (arsenalWasFavorite) dao.addFavorite(pl.stasgroch.footballhub.data.local.FavoriteEntity(1)) else dao.removeFavorite(1)
     }
 
@@ -61,6 +64,27 @@ class FootballUiTest {
         val target = hasText(text) and hasSetTextAction().not()
         rule.onNode(hasScrollToIndexAction() and androidx.compose.ui.test.SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.VerticalScrollAxisRange)).performScrollToNode(target)
         rule.onNode(target).performClick()
+    }
+
+    @Test fun playerFavoritesPersistAndCanBeRemoved() {
+        waitFor("Mecze dnia")
+        rule.onNodeWithTag("team-search").performClick().performTextInput("bruno")
+        rule.onNodeWithTag("search-player-101").performClick()
+        if (rule.onAllNodesWithContentDescription("Usuń zawodnika z ulubionych").fetchSemanticsNodes().isNotEmpty()) click("Usuń zawodnika z ulubionych")
+        click("Dodaj zawodnika do ulubionych")
+        rule.activityRule.scenario.recreate()
+        waitFor("Usuń zawodnika z ulubionych")
+        screenshot("player-favorite")
+        click("Ulubione")
+        rule.onNodeWithTag("favorites-tab-1").performClick()
+        rule.onNodeWithTag("favorite-player-101").assertIsDisplayed()
+        screenshot("favorite-players")
+        rule.onNodeWithTag("favorite-player-101").performClick()
+        rule.onNodeWithTag("player-profile-101").assertIsDisplayed()
+        click("Ulubione")
+        rule.onNodeWithTag("favorites-tab-1").performClick()
+        click("Usuń zawodnika z ulubionych")
+        rule.onNodeWithTag("favorite-player-101").assertDoesNotExist()
     }
 
     @Test fun teamSearchSuggestionsDismissAndProfile() {
@@ -276,8 +300,8 @@ class FootballUiTest {
         rule.onNodeWithTag("player-profile-913").assertIsDisplayed()
         rule.onNodeWithTag("player-tab-1").performClick()
         rule.onNodeWithTag("appearance-3").assertIsDisplayed()
-        rule.onNodeWithText("Wejście 63′").assertIsDisplayed()
-        rule.onNodeWithText("Gol 78′").assertIsDisplayed()
+        rule.onNodeWithText("Wejście 63′").assertDoesNotExist()
+        rule.onNodeWithContentDescription("Gol").assertIsDisplayed()
         screenshot("player-appearance")
         androidx.test.espresso.Espresso.pressBack()
         rule.onNodeWithTag("team-tab-3").assertIsSelected()

@@ -81,16 +81,19 @@ fun LazyListScope.playerRoster(players: List<Player>, highlightedId: Int? = null
                 Text("Brak pełnego ustawienia — prezentujemy dostępnych zawodników.", style = MaterialTheme.typography.bodySmall)
                 rows.flatten().distinctBy { it.id }.forEach { PlayerRow(it, openPlayer = openPlayer, events = events) }
             }
+            lineup.coach?.let { coach ->
+                Surface(shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                        Text(coach.name, style = MaterialTheme.typography.bodyMedium)
+                        Text("Trener", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
             Text("Rezerwowi", style = MaterialTheme.typography.titleSmall)
             val bench = lineup.substitutes.orEmpty().mapNotNull { id -> data.players.find { it.id == id } }
             if (bench.isEmpty()) Text("Lista rezerwowych nie jest dostępna.", style = MaterialTheme.typography.bodySmall)
             bench.forEach { PlayerRow(it, openPlayer = openPlayer, events = events) }
-            lineup.coach?.let { coach ->
-                Text("Trener • ${team.name}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
-                Text(coach.name, style = MaterialTheme.typography.bodyMedium)
-            }
-            if (events.isNotEmpty()) Text("${if (data.matchEvents.find { it.matchId == match.id }?.demo == true) "DEMO • " else ""}G: gol, A: asysta, GS: samobójczy, ŻK/2ŻK/CK: kartki, ↑/↓: zmiana",
-                style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
+            if (events.isNotEmpty()) EventLegend()
         }
     }
 }
@@ -99,7 +102,7 @@ fun LazyListScope.playerRoster(players: List<Player>, highlightedId: Int? = null
     val line = Color.White.copy(alpha = .28f)
     // Height grows with row count; labels can wrap instead of colliding on narrow screens.
     BoxWithConstraints(Modifier.fillMaxWidth().testTag("football-pitch").background(Color(0xFF12382F), MaterialTheme.shapes.medium)) {
-        val pitchHeight = maxWidth * 1.45f
+        val pitchHeight = (maxWidth * 1.45f).coerceAtLeast(120.dp * rows.size)
         Canvas(Modifier.matchParentSize().padding(8.dp)) {
             val w = size.width; val h = size.height; val stroke = Stroke(1.dp.toPx())
             drawRect(line, style = stroke)
@@ -109,9 +112,9 @@ fun LazyListScope.playerRoster(players: List<Player>, highlightedId: Int? = null
             listOf(0f, h * .84f).forEach { y -> drawRect(line, Offset(w * .2f, y), Size(w * .6f, h * .16f), style = stroke) }
             listOf(0f, h * .94f).forEach { y -> drawRect(line, Offset(w * .36f, y), Size(w * .28f, h * .06f), style = stroke) }
         }
-        Column(Modifier.fillMaxWidth().heightIn(min = pitchHeight).padding(horizontal = 12.dp, vertical = 24.dp), verticalArrangement = Arrangement.SpaceBetween) {
+        Column(Modifier.fillMaxWidth().height(pitchHeight).padding(horizontal = 12.dp, vertical = 24.dp)) {
             rows.asReversed().forEach { row ->
-                Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+                Row(Modifier.fillMaxWidth().weight(1f).padding(vertical = 8.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
                     row.forEach { player ->
                         Column(Modifier.weight(1f).heightIn(min = 48.dp).clickable(role = Role.Button, onClickLabel = "Profil: ${player.name}") { openPlayer(player.id) }.testTag("pitch-player-${player.id}").padding(horizontal = 2.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                             Surface(shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.primaryContainer) {
@@ -119,7 +122,8 @@ fun LazyListScope.playerRoster(players: List<Player>, highlightedId: Int? = null
                             }
                             Text(player.name.substringAfterLast(' '), Modifier.fillMaxWidth(), textAlign = TextAlign.Center,
                                 style = MaterialTheme.typography.labelSmall, color = Color.White)
-                            val marks = playerEventMarks(player.id, events)
+                            PlayerAchievements(player.id, events)
+                            val marks = events.firstOrNull { it.kind == EventKind.SUBSTITUTION && it.involves(player.id) }?.let { "${if (it.incomingPlayerId == player.id) "↑" else "↓"}${it.time.label}" }.orEmpty()
                             if (marks.isNotBlank()) Text(marks, Modifier.fillMaxWidth(), textAlign = TextAlign.Center,
                                 style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                         }

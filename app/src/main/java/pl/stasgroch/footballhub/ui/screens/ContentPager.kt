@@ -21,7 +21,7 @@ fun MeasuredContentPager(state: PagerState, modifier: Modifier = Modifier,
     var heights by rememberSaveable { mutableStateOf(List(state.pageCount) { 1 }) }
     val height = with(LocalDensity.current) { (heights.maxOrNull() ?: 1).toDp() }
     HorizontalPager(state, modifier.height(height.coerceAtLeast(1.dp)),
-        beyondViewportPageCount = state.pageCount - 1, verticalAlignment = Alignment.Top) { page ->
+        pageSpacing = 16.dp, beyondViewportPageCount = state.pageCount - 1, verticalAlignment = Alignment.Top) { page ->
         Column(Modifier.pageSemantics(state, page).fillMaxWidth().wrapContentHeight(unbounded = true)
             .onSizeChanged { size ->
                 if (heights[page] != size.height) heights = heights.toMutableList().also { it[page] = size.height }

@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
+import pl.stasgroch.footballhub.ui.theme.hubHeaderGradient
 import pl.stasgroch.footballhub.ui.theme.HubSpace
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -79,8 +80,15 @@ import pl.stasgroch.footballhub.data.model.*
     var away by rememberSaveable(existing?.id, match.id, kind) { mutableStateOf(existing?.awayScore?.toString() ?: "") }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
     val focus = LocalFocusManager.current
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        SectionTitle(if (existing == null) "Nowy wpis" else "Edytuj wpis", if (kind == "NOTE") "Notatka do meczu" else "Przewidywany wynik")
+    Column(Modifier.fillMaxSize()) {
+        Row(Modifier.fillMaxWidth().hubHeaderGradient().statusBarsPadding().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(cancel) { Icon(HubIcons.Back, "Wstecz") }
+            Column {
+                Text(if (existing == null) "Nowy wpis" else "Edytuj wpis", style = MaterialTheme.typography.titleLarge)
+                Text(if (kind == "NOTE") "Notatka do meczu" else "Przewidywany wynik", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface) {
             Column(Modifier.fillMaxWidth().padding(HubSpace.md), verticalArrangement = Arrangement.spacedBy(HubSpace.sm)) {
                 listOf(data.team(match.homeId), data.team(match.awayId)).forEach { team ->
@@ -109,11 +117,35 @@ import pl.stasgroch.footballhub.data.model.*
         TextButton(cancel, enabled = !saving, modifier = Modifier.fillMaxWidth().heightIn(min = HubSpace.touch)) { Text("Anuluj") }
     }
 }
-@Composable fun FavoritesScreen(data: FootballData, favorites: Set<Int>, openTeam: (Int) -> Unit, remove: (Int) -> Unit, browse: () -> Unit, listState: LazyListState = rememberLazyListState()) {
+}
+@Composable fun FavoritesScreen(data: FootballData, favorites: Set<Int>, openTeam: (Int) -> Unit, remove: (Int) -> Unit, browse: () -> Unit, listState: LazyListState = rememberLazyListState(), favoritePlayers: Set<Int> = emptySet(), openPlayer: (Int) -> Unit = {}, removePlayer: (Int) -> Unit = {}) {
+    var selected by rememberSaveable { mutableIntStateOf(0) }
     LazyColumn(state = listState, contentPadding = navigationListPadding(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item { SectionTitle("Ulubione drużyny", "Twoje kluby zawsze pod ręką") }
-        if (favorites.isEmpty()) item { Column(verticalArrangement = Arrangement.spacedBy(HubSpace.md)) { EmptyState("Nie masz jeszcze ulubionych. Otwórz drużynę z tabeli ligi lub szczegółów meczu.", HubIcons.Star); PrimaryAction("Przeglądaj ligi", onClick = browse) } }
-        items(data.teams.filter { it.id in favorites }, key = { it.id }) { team ->
+        item { SectionTitle("Ulubione drużyny i zawodnicy", "Zawsze pod ręką") }
+        if (favorites.isEmpty() && favoritePlayers.isEmpty()) item { Column(verticalArrangement = Arrangement.spacedBy(HubSpace.md)) { EmptyState("Nie masz jeszcze ulubionych. Dodaj drużynę lub zawodnika gwiazdką na jego profilu.", HubIcons.Star); PrimaryAction("Przeglądaj ligi", onClick = browse) } }
+        if (favorites.isNotEmpty() || favoritePlayers.isNotEmpty()) item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("Drużyny", "Zawodnicy").forEachIndexed { index, label ->
+                    FilterChip(selected == index, { selected = index }, { Text(label) }, modifier = Modifier.weight(1f).testTag("favorites-tab-$index"))
+                }
+            }
+        }
+        if (selected == 1) {
+            if (favoritePlayers.isEmpty() && favorites.isNotEmpty()) item { Text("Nie masz jeszcze ulubionych zawodników.") }
+            items(data.players.filter { it.id in favoritePlayers }, key = { "player-${it.id}" }) { player ->
+                Card(onClick = { openPlayer(player.id) }, modifier = Modifier.fillMaxWidth().testTag("favorite-player-${player.id}")) {
+                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(player.name, style = MaterialTheme.typography.titleSmall)
+                            data.teams.find { it.id == player.teamId }?.let { Text(it.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                        }
+                        IconButton({ removePlayer(player.id) }) { Icon(HubIcons.StarFilled, "Usuń zawodnika z ulubionych", tint = MaterialTheme.colorScheme.primary) }
+                    }
+                }
+            }
+        }
+        if (selected == 0 && favorites.isEmpty() && favoritePlayers.isNotEmpty()) item { Text("Nie masz jeszcze ulubionych drużyn.") }
+        if (selected == 0) items(data.teams.filter { it.id in favorites }, key = { it.id }) { team ->
             Card(onClick = { openTeam(team.id) }, modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
                 Column(Modifier.padding(12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(HubSpace.md)) {

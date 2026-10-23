@@ -26,6 +26,20 @@ data class MatchEvents(val matchId: Int, val coverage: EventCoverage = EventCove
 data class PlayerAppearance(val playerId: Int, val matchId: Int, val teamId: Int,
     val started: Boolean? = null, val minutesPlayed: Int? = null)
 
+/** Regulation minutes; added time is not included in this compact display. */
+fun PlayerAppearance.playedMinutes(events: MatchEvents?, finished: Boolean): Int? {
+    minutesPlayed?.let { return it }
+    if (!finished || events?.coverage != EventCoverage.COMPLETE) return null
+    val start = if (started == true) 0 else events.events.firstOrNull {
+        it.kind == EventKind.SUBSTITUTION && it.incomingPlayerId == playerId
+    }?.time?.minute ?: return null
+    val end = events.events.filter {
+        it.playerId == playerId && (it.kind == EventKind.SUBSTITUTION ||
+            (it.kind == EventKind.CARD && it.cardKind in listOf(CardKind.RED, CardKind.SECOND_YELLOW)))
+    }.minOfOrNull { it.time.minute } ?: 90
+    return (end.coerceAtMost(90) - start.coerceAtMost(90)).coerceAtLeast(0)
+}
+
 fun FootballData.eventsFor(matchId: Int): List<MatchEvent> =
     matchEvents.find { it.matchId == matchId }?.events.orEmpty().sortedWith(compareBy({ it.time }, { it.id }))
 

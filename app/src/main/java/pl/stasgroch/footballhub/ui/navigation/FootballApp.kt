@@ -27,6 +27,7 @@ import pl.stasgroch.footballhub.ui.theme.hubHeaderGradient
     val focusManager = LocalFocusManager.current
     val state by vm.state.collectAsStateWithLifecycle()
     val entries by vm.entries.collectAsStateWithLifecycle()
+    val favoritePlayers by vm.favoritePlayers.collectAsStateWithLifecycle()
     val favorites by vm.favorites.collectAsStateWithLifecycle()
     val saving by vm.saving.collectAsStateWithLifecycle()
     val userDataReady by vm.userDataReady.collectAsStateWithLifecycle()
@@ -58,8 +59,8 @@ import pl.stasgroch.footballhub.ui.theme.hubHeaderGradient
     }
     Box(Modifier.fillMaxSize()) {
     Scaffold(
-        contentWindowInsets = if (route in listOf("league/{id}", "team/{id}?player={player}", "player/{id}", "match/{id}")) WindowInsets.navigationBars else ScaffoldDefaults.contentWindowInsets,
-        topBar = { if (route !in listOf("league/{id}", "team/{id}?player={player}", "player/{id}", "match/{id}")) {
+        contentWindowInsets = if (route in listOf("league/{id}", "team/{id}?player={player}", "player/{id}", "match/{id}", "form/{matchId}/{kind}/{entryId}")) WindowInsets.navigationBars else ScaffoldDefaults.contentWindowInsets,
+        topBar = { if (route !in listOf("league/{id}", "team/{id}?player={player}", "player/{id}", "match/{id}", "form/{matchId}/{kind}/{entryId}")) {
             if (tabs.none { it.first == route }) {
                 Row(Modifier.fillMaxWidth().hubHeaderGradient().statusBarsPadding().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
                     IconButton({ nav.popBackStack() }) { Icon(HubIcons.Back, "Wstecz") }
@@ -124,9 +125,16 @@ import pl.stasgroch.footballhub.ui.theme.hubHeaderGradient
                 }
                 composable("player/{id}") {
                     PlayerScreen(it.arguments?.getString("id")?.toIntOrNull() ?: -1, data,
-                        openMatch = { id -> nav.navigate("match/$id") }, openTeam = { id -> nav.navigate("team/$id") }, back = { nav.popBackStack() })
+                        openMatch = { id -> nav.navigate("match/$id") }, openTeam = { id -> nav.navigate("team/$id") }, back = { nav.popBackStack() }, favorite = {
+                            val playerId = it.arguments?.getString("id")?.toIntOrNull() ?: -1
+                            IconToggleButton(playerId in favoritePlayers, { vm.favoritePlayer(playerId, it) }, enabled = !saving) {
+                                Icon(if (playerId in favoritePlayers) HubIcons.StarFilled else HubIcons.Star,
+                                    if (playerId in favoritePlayers) "Usuń zawodnika z ulubionych" else "Dodaj zawodnika do ulubionych",
+                                    tint = if (playerId in favoritePlayers) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                            }
+                        })
                 }
-                composable("favorites") { FavoritesScreen(data, favorites, { nav.navigate("team/$it") }, { vm.favorite(it, false) }, { nav.navigate("leagues") }, favoritesList) }
+                composable("favorites") { FavoritesScreen(data, favorites, { nav.navigate("team/$it") }, { vm.favorite(it, false) }, { nav.navigate("leagues") }, favoritesList, favoritePlayers, { nav.navigate("player/$it") }, { vm.favoritePlayer(it, false) }) }
                 composable("journal") { JournalScreen(data, entries, journalFilter, { journalFilter = it }, { nav.navigate("match/$it") }, { nav.navigate("form/${it.matchId}/${it.kind}/${it.id}") }, vm::deleteEntry, { nav.navigate("matches") }, journalList) }
                 composable("form/{matchId}/{kind}/{entryId}") { backStack ->
                     val matchId = backStack.arguments?.getString("matchId")?.toIntOrNull() ?: -1

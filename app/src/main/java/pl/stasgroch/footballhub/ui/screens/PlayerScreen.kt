@@ -19,7 +19,7 @@ import pl.stasgroch.footballhub.ui.theme.hubHeaderGradient
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
-@Composable fun PlayerScreen(id: Int, data: FootballData, openMatch: (Int) -> Unit, openTeam: (Int) -> Unit, back: () -> Unit = {}) {
+@Composable fun PlayerScreen(id: Int, data: FootballData, openMatch: (Int) -> Unit, openTeam: (Int) -> Unit, back: () -> Unit = {}, favorite: @Composable () -> Unit = {}) {
     val player = data.players.find { it.id == id }
     if (player == null) { EmptyState("Nie znaleziono zawodnika."); return }
     val team = data.teams.find { it.id == player.teamId }
@@ -42,6 +42,7 @@ import java.time.format.DateTimeFormatter
                         Text(team.name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
+                favorite()
             }
             if (player.demo) Text("DEMO • fikcyjny profil zawodnika", color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.labelSmall)
         }
@@ -93,25 +94,17 @@ import java.time.format.DateTimeFormatter
                     if (birth == null) item { Text("Data urodzenia i wiek nie są dostępne.", style = MaterialTheme.typography.bodySmall) }
                     if (team == null) item { Text("Aktualny klub nie jest znany.", style = MaterialTheme.typography.bodySmall) }
                 } else {
-                    val appearances = data.appearances.filter { it.playerId == id }.mapNotNull { appearance ->
-                        data.matches.find { it.id == appearance.matchId }?.let { appearance to it }
-                    }.sortedByDescending { it.second.date + it.second.time }
-                    if (appearances.isEmpty()) item { EmptyState("Brak dostępnej historii występów.") }
-                    items(appearances, key = { it.second.id }) { (appearance, match) ->
-                        val home = appearance.teamId == match.homeId
-                        val opponent = data.teams.find { it.id == if (home) match.awayId else match.homeId }
-                        Card(onClick = { openMatch(match.id) }, modifier = Modifier.fillMaxWidth().testTag("appearance-${match.id}")) {
-                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text("${displayDate(match.date)} • ${data.leagues.find { it.id == match.leagueId }?.name.orEmpty()}", style = MaterialTheme.typography.labelSmall)
-                                Text("${opponent?.name ?: "Nieznany przeciwnik"} • ${if (home) "Dom" else "Wyjazd"}", style = MaterialTheme.typography.titleSmall)
-                                Text("${match.homeScore ?: "—"} : ${match.awayScore ?: "—"} • ${when (appearance.started) { true -> "Wyjściowy skład"; false -> "Wejście z ławki"; null -> "Udział potwierdzony" }}",
-                                    color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
-                                data.eventsFor(match.id).filter { it.involves(id) }.forEach { Text(it.playerSummary(id), style = MaterialTheme.typography.labelSmall) }
-                                val coverage = data.matchEvents.find { it.matchId == match.id }
-                                if (coverage?.demo == true) Text("DEMO • przykładowy występ i zdarzenia", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
-                                if (coverage == null || coverage.coverage != EventCoverage.COMPLETE) Text("Informacje o zdarzeniach mogą być niepełne.", style = MaterialTheme.typography.labelSmall)
-                            }
-                        }
+                    val appearances = data.appearances.filter { it.playerId == id }.associateBy { it.matchId }
+                    val unusedBench = data.lineups.filter { lineup ->
+                        id in lineup.substitutes.orEmpty() && lineup.matchId !in appearances &&
+                            data.matchEvents.any { it.matchId == lineup.matchId && it.coverage == EventCoverage.COMPLETE }
+                    }.associateBy { it.matchId }
+                    val matches = data.matches.filter { it.id in appearances || (it.status == "FINISHED" && it.id in unusedBench) }
+                        .sortedByDescending { it.date + it.time }
+                    if (matches.isEmpty()) item { EmptyState("Brak dostępnej historii występów.") }
+                    items(matches, key = { it.id }) { match ->
+                        val teamId = appearances[match.id]?.teamId ?: unusedBench[match.id]?.teamId
+                        PlayerMatchRow(match, data, id, teamId, match.id !in appearances) { openMatch(match.id) }
                     }
                 }
             }

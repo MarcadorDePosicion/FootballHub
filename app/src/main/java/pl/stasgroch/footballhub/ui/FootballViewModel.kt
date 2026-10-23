@@ -20,6 +20,7 @@ data class FootballUiState(val data: FootballData = FootballData(), val loading:
 class FootballViewModel(application: Application) : AndroidViewModel(application) {
     private val users = RoomUserRepository(FootballDatabase.get(application).userDao())
     val entries = MutableStateFlow<List<JournalEntry>>(emptyList())
+    val favoritePlayers = MutableStateFlow<Set<Int>>(emptySet())
     val favorites = MutableStateFlow<Set<Int>>(emptySet())
     val userDataReady = MutableStateFlow(false)
     val saving = MutableStateFlow(false)
@@ -30,7 +31,8 @@ class FootballViewModel(application: Application) : AndroidViewModel(application
         refresh()
         viewModelScope.launch {
             try {
-                combine(users.entries, users.favorites) { e, f -> e to f }.collect { (e, f) ->
+                combine(users.entries, users.favorites, users.favoritePlayers) { e, f, p -> Triple(e, f, p) }.collect { (e, f, p) ->
+                    favoritePlayers.value = p
                     entries.value = e
                     favorites.value = f
                     userDataReady.value = true
@@ -46,6 +48,7 @@ class FootballViewModel(application: Application) : AndroidViewModel(application
         mutate(done) { users.save(JournalEntry(id ?: UUID.randomUUID().toString(), matchId, kind, text.trim(), if (kind == "PREDICTION") home.toInt() else null, if (kind == "PREDICTION") away.toInt() else null)) }
     }
     fun deleteEntry(id: String) = mutate { users.delete(id) }
+    fun favoritePlayer(id: Int, enabled: Boolean) = mutate { users.favoritePlayer(id, enabled) }
     fun favorite(id: Int, enabled: Boolean) = mutate { users.favorite(id, enabled) }
     private fun mutate(done: () -> Unit = {}, action: suspend () -> Unit) {
         if (saving.value) return

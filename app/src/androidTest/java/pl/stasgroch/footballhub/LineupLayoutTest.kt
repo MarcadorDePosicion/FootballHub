@@ -11,6 +11,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import org.junit.Rule
 import org.junit.Test
+import org.junit.Assert.assertEquals
 import pl.stasgroch.footballhub.data.model.*
 import pl.stasgroch.footballhub.data.remote.DemoData
 import pl.stasgroch.footballhub.ui.screens.*
@@ -18,6 +19,21 @@ import pl.stasgroch.footballhub.ui.theme.FootballHubTheme
 
 class LineupLayoutTest {
     @get:Rule val rule = createComposeRule()
+
+    @Test fun eventsDoNotMoveFormationRows() {
+        val data = DemoData.create()
+        val match = data.matches.first { it.id == 3 }
+        rule.setContent { FootballHubTheme {
+            LazyColumn { item { MatchLineups(match, data) } }
+        } }
+        val home = data.lineups.first { it.matchId == 3 && it.teamId == match.homeId }.starterRows!!.flatten()
+        val homePositions = home.map { rule.onNodeWithTag("pitch-player-$it").fetchSemanticsNode().boundsInRoot.top }
+        rule.onNodeWithTag("lineup-away").performClick()
+        val away = data.lineups.first { it.matchId == 3 && it.teamId == match.awayId }.starterRows!!.flatten()
+        away.forEachIndexed { index, id ->
+            assertEquals(homePositions[index], rule.onNodeWithTag("pitch-player-$id").fetchSemanticsNode().boundsInRoot.top, 1f)
+        }
+    }
 
     @Test fun missingFormationAndOptionalPlayerFieldsStayReadable() {
         val original = DemoData.create()

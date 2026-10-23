@@ -8,6 +8,8 @@ import pl.stasgroch.footballhub.data.model.JournalEntry
 interface UserRepository {
     val entries: Flow<List<JournalEntry>>
     val favorites: Flow<Set<Int>>
+    val favoritePlayers: Flow<Set<Int>>
+    suspend fun favoritePlayer(playerId: Int, enabled: Boolean)
     suspend fun save(entry: JournalEntry)
     suspend fun delete(id: String)
     suspend fun favorite(teamId: Int, enabled: Boolean)
@@ -15,6 +17,10 @@ interface UserRepository {
 class RoomUserRepository(private val dao: UserDao) : UserRepository {
     override val entries = dao.entries().map { rows ->
         rows.map { JournalEntry(it.id, it.matchId, it.kind, it.text, it.homeScore, it.awayScore, it.updatedAt) }
+    }
+    override val favoritePlayers = dao.favoritePlayers().map { rows -> rows.map { it.playerId }.toSet() }
+    override suspend fun favoritePlayer(playerId: Int, enabled: Boolean) {
+        if (enabled) dao.addFavoritePlayer(FavoritePlayerEntity(playerId)) else dao.removeFavoritePlayer(playerId)
     }
     override val favorites = dao.favorites().map { rows -> rows.map { it.teamId }.toSet() }
     override suspend fun save(entry: JournalEntry) = dao.save(
