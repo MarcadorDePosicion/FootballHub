@@ -58,12 +58,11 @@ import pl.stasgroch.footballhub.ui.theme.hubHeaderGradient
     }
     Box(Modifier.fillMaxSize()) {
     Scaffold(
-        topBar = { if (route !in listOf("league/{id}", "team/{id}?player={player}")) {
+        contentWindowInsets = if (route in listOf("league/{id}", "team/{id}?player={player}", "player/{id}", "match/{id}")) WindowInsets.navigationBars else ScaffoldDefaults.contentWindowInsets,
+        topBar = { if (route !in listOf("league/{id}", "team/{id}?player={player}", "player/{id}", "match/{id}")) {
             if (tabs.none { it.first == route }) {
                 Row(Modifier.fillMaxWidth().hubHeaderGradient().statusBarsPadding().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
                     IconButton({ nav.popBackStack() }) { Icon(HubIcons.Back, "Wstecz") }
-                    if (route == "player/{id}") Text("Profil zawodnika", style = MaterialTheme.typography.titleLarge)
-                    if (route == "match/{id}") Text("Szczegóły meczu", style = MaterialTheme.typography.titleLarge)
                 }
             } else {
             TopAppBar(title = {
@@ -103,7 +102,7 @@ import pl.stasgroch.footballhub.ui.theme.hubHeaderGradient
                 composable("leagues") { LeaguesScreen(data, leaguesList) { nav.navigate("league/$it") } }
                 composable("league/{id}") { StandingsScreen(it.arguments?.getString("id")?.toIntOrNull() ?: -1, data, favorites, openMatch = { id -> nav.navigate("match/$id") }, back = { nav.popBackStack() }) { id -> nav.navigate("team/$id") } }
                 composable("team/{id}?player={player}") {
-                    TeamScreen(it.arguments?.getString("id")?.toIntOrNull() ?: -1, data, { id -> nav.navigate("match/$id") }, openTeam = { id -> nav.navigate("team/$id") { launchSingleTop = true } }, back = { nav.popBackStack() }, highlightedPlayerId = it.arguments?.getString("player")?.toIntOrNull(), openPlayer = { id -> nav.navigate("player/$id") }) { team ->
+                    TeamScreen(it.arguments?.getString("id")?.toIntOrNull() ?: -1, data, { id -> nav.navigate("match/$id") }, openTeam = { id -> nav.navigate("team/$id") { launchSingleTop = true } }, back = { nav.popBackStack() }, openLeague = { id -> nav.navigate("league/$id") }, highlightedPlayerId = it.arguments?.getString("player")?.toIntOrNull(), openPlayer = { id -> nav.navigate("player/$id") }) { team ->
                         IconToggleButton(checked = team.id in favorites, onCheckedChange = { vm.favorite(team.id, it) }, enabled = !saving) {
                             Icon(if (team.id in favorites) HubIcons.StarFilled else HubIcons.Star,
                                 if (team.id in favorites) "Usuń z ulubionych" else "Dodaj do ulubionych",
@@ -112,16 +111,10 @@ import pl.stasgroch.footballhub.ui.theme.hubHeaderGradient
                     }
                 }
                 composable("match/{id}") {
-                    MatchDetailsScreen(it.arguments?.getString("id")?.toIntOrNull() ?: -1, data, { id -> nav.navigate("team/$id") }, { id -> nav.navigate("league/$id") }, openPlayer = { id -> nav.navigate("player/$id") }, actions = { match ->
-                        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button({ nav.navigate("form/${match.id}/NOTE/new") }, Modifier.weight(1f).fillMaxHeight().heightIn(min = 48.dp),
-                                contentPadding = PaddingValues(horizontal = 8.dp), shape = MaterialTheme.shapes.medium) {
-                                Text("Dodaj notatkę", style = MaterialTheme.typography.labelMedium)
-                            }
-                            FilledTonalButton({ nav.navigate("form/${match.id}/PREDICTION/new") }, Modifier.weight(1f).fillMaxHeight().heightIn(min = 48.dp),
-                                contentPadding = PaddingValues(horizontal = 8.dp), shape = MaterialTheme.shapes.medium) {
-                                Text("Dodaj typ wyniku", style = MaterialTheme.typography.labelMedium)
-                            }
+                    MatchDetailsScreen(it.arguments?.getString("id")?.toIntOrNull() ?: -1, data, { id -> nav.navigate("team/$id") }, { id -> nav.navigate("league/$id") }, openPlayer = { id -> nav.navigate("player/$id") }, back = { nav.popBackStack() }, actions = { match ->
+                        Row {
+                            IconButton({ nav.navigate("form/${match.id}/NOTE/new") }) { Icon(HubIcons.Notes, "Dodaj notatkę", tint = MaterialTheme.colorScheme.primary) }
+                            if (match.status != "FINISHED") IconButton({ nav.navigate("form/${match.id}/PREDICTION/new") }) { Icon(HubIcons.Matches, "Dodaj typ wyniku", tint = MaterialTheme.colorScheme.secondary) }
                         }
                     }) { match ->
                         val own = entries.filter { e -> e.matchId == match.id }
@@ -131,7 +124,7 @@ import pl.stasgroch.footballhub.ui.theme.hubHeaderGradient
                 }
                 composable("player/{id}") {
                     PlayerScreen(it.arguments?.getString("id")?.toIntOrNull() ?: -1, data,
-                        openMatch = { id -> nav.navigate("match/$id") }, openTeam = { id -> nav.navigate("team/$id") })
+                        openMatch = { id -> nav.navigate("match/$id") }, openTeam = { id -> nav.navigate("team/$id") }, back = { nav.popBackStack() })
                 }
                 composable("favorites") { FavoritesScreen(data, favorites, { nav.navigate("team/$it") }, { vm.favorite(it, false) }, { nav.navigate("leagues") }, favoritesList) }
                 composable("journal") { JournalScreen(data, entries, journalFilter, { journalFilter = it }, { nav.navigate("match/$it") }, { nav.navigate("form/${it.matchId}/${it.kind}/${it.id}") }, vm::deleteEntry, { nav.navigate("matches") }, journalList) }

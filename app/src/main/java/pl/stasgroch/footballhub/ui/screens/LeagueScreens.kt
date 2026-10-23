@@ -1,6 +1,7 @@
 package pl.stasgroch.footballhub.ui.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.pager.*
 import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.Color
@@ -49,7 +50,7 @@ import pl.stasgroch.footballhub.ui.theme.HubSpace
         contentWindowInsets = WindowInsets(0, 0, 0, 0), topBar = {
         Column {
             TopAppBar(
-                modifier = Modifier.hubHeaderGradient().testTag("league-header"),
+                modifier = Modifier.hubHeaderGradient().statusBarsPadding().testTag("league-header"),
                 title = { Column {
                     Text(league.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text("${league.country}", style = MaterialTheme.typography.labelSmall,
@@ -87,7 +88,7 @@ import pl.stasgroch.footballhub.ui.theme.HubSpace
 }
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable fun TeamScreen(id: Int, data: FootballData, openMatch: (Int) -> Unit,
-    openTeam: (Int) -> Unit = {}, back: () -> Unit = {}, highlightedPlayerId: Int? = null, openPlayer: (Int) -> Unit = {}, favorite: @Composable (Team) -> Unit = {}) {
+    openTeam: (Int) -> Unit = {}, back: () -> Unit = {}, highlightedPlayerId: Int? = null, openPlayer: (Int) -> Unit = {}, openLeague: (Int) -> Unit = {}, favorite: @Composable (Team) -> Unit = {}) {
     val team = data.teams.find { it.id == id }
     if (team == null) { EmptyState("Nie znaleziono drużyny."); return }
     val league = data.leagues.find { it.id == team.leagueId }
@@ -96,11 +97,11 @@ import pl.stasgroch.footballhub.ui.theme.HubSpace
     val tab = pager.currentPage
     val lists = listOf(rememberLazyListState(), rememberLazyListState(), rememberLazyListState(), rememberLazyListState())
     Column(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxWidth().hubHeaderGradient()) {
-            IconButton(back) { Icon(HubIcons.Back, "Wstecz") }
+        Column(Modifier.fillMaxWidth().hubHeaderGradient().statusBarsPadding()) {
             Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                TeamEmblem(team, 48.dp)
+                IconButton(back) { Icon(HubIcons.Back, "Wstecz") }
+                TeamEmblem(team, 40.dp)
                 Column(Modifier.weight(1f)) {
                     Text(team.name, style = MaterialTheme.typography.titleLarge)
                     league?.let { Text(it.country, style = MaterialTheme.typography.bodySmall,
@@ -109,7 +110,7 @@ import pl.stasgroch.footballhub.ui.theme.HubSpace
                 favorite(team)
             }
             SecondaryScrollableTabRow(tab, containerColor = Color.Transparent, edgePadding = 0.dp) {
-                listOf("Mecze", "Tabela", "Informacje", "Zawodnicy").forEachIndexed { index, label ->
+                listOf("Mecze", "Tabela", "Informacje", "Skład").forEachIndexed { index, label ->
                     Tab(tab == index, { scope.launch { pager.animateScrollToPage(index) } }, text = { Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1) },
                         modifier = Modifier.testTag("team-tab-$index"))
                 }
@@ -119,7 +120,18 @@ import pl.stasgroch.footballhub.ui.theme.HubSpace
             LazyColumn(Modifier.pageSemantics(pager, page).fillMaxSize().testTag(if (page == pager.currentPage) "team-list" else "team-list-$page"),
                 state = lists[page], contentPadding = detailListPadding(), verticalArrangement = Arrangement.spacedBy(HubSpace.md)) {
                 when (page) {
-                    3 -> playerRoster(data.players.filter { it.teamId == id }, highlightedPlayerId, openPlayer)
+                    3 -> {
+                        val coach = data.lineups.filter { it.teamId == id }.firstNotNullOfOrNull { it.coach }
+                        if (coach != null) item {
+                            Surface(shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
+                                Column(Modifier.padding(12.dp)) {
+                                    Text(coach.name, style = MaterialTheme.typography.bodyMedium)
+                                    Text("Trener", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                        playerRoster(data.players.filter { it.teamId == id }, highlightedPlayerId, openPlayer)
+                    }
                     0 -> {
                         item { SectionTitle("Mecze drużyny") }
                         val matches = data.matches.filter { it.homeId == id || it.awayId == id }
@@ -127,7 +139,13 @@ import pl.stasgroch.footballhub.ui.theme.HubSpace
                         items(matches) { MatchCard(it, data) { openMatch(it.id) } }
                     }
                     1 -> {
-                        item { SectionTitle(league?.name ?: "Tabela ligi", "Wyróżniona drużyna: ${team.name}") }
+                        item {
+                            Column {
+                                Text(league?.name ?: "Tabela ligi", style = MaterialTheme.typography.titleLarge,
+                                    modifier = Modifier.fillMaxWidth().clickable(enabled = league != null) { league?.let { openLeague(it.id) } }.padding(vertical = 8.dp).testTag("team-league-link"))
+                                Text("Wyróżniona drużyna: ${team.name}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
                         val rows = data.standings.filter { it.leagueId == team.leagueId }.sortedByDescending { it.points }
                         if (rows.isEmpty()) item { EmptyState("Tabela tej ligi nie jest jeszcze dostępna.") }
                         else item { StandingsTable(rows, data, emptySet(), openTeam, highlightedTeamId = id) }

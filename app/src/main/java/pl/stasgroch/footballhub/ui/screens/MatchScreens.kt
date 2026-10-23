@@ -19,6 +19,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import pl.stasgroch.footballhub.data.model.*
 import pl.stasgroch.footballhub.ui.theme.HubSpace
+import pl.stasgroch.footballhub.ui.theme.hubHeaderGradient
 import java.time.LocalDate
 
 @Composable fun HomeScreen(data: FootballData, listState: LazyListState, openMatch: (Int) -> Unit) {
@@ -53,7 +54,7 @@ import java.time.LocalDate
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.padding(horizontal = 16.dp)) {
             SectionTitle("Centrum meczowe", "Terminarz i wyniki • $count spotkań")
-            MatchFilterPanel(data, filters)
+            MatchFilterPanel(data, filters, pager, anchor)
         }
         HorizontalPager(pager, Modifier.weight(1f).testTag("days-pager")) { page ->
             val date = LocalDate.ofEpochDay(anchor + page - 100000).toString()
@@ -76,20 +77,37 @@ import java.time.LocalDate
         }
     }
 }
-@Composable fun MatchDetailsScreen(id: Int, data: FootballData, openTeam: (Int) -> Unit, openLeague: (Int) -> Unit, openPlayer: (Int) -> Unit = {}, actions: @Composable (Match) -> Unit = {}, content: @Composable ColumnScope.(Match) -> Unit = {}) {
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable fun MatchDetailsScreen(id: Int, data: FootballData, openTeam: (Int) -> Unit, openLeague: (Int) -> Unit, openPlayer: (Int) -> Unit = {}, actions: @Composable (Match) -> Unit = {}, back: () -> Unit = {}, content: @Composable ColumnScope.(Match) -> Unit = {}) {
     val match = data.matches.find { it.id == id }
     if (match == null) { EmptyState("Nie znaleziono meczu."); return }
     val home = data.team(match.homeId)
     val away = data.team(match.awayId)
-    val pager = rememberPagerState { 2 }
+    val pager = rememberPagerState { 3 }
     val scope = rememberCoroutineScope()
     val tab = pager.currentPage
-    LazyColumn(modifier = Modifier.fillMaxSize().testTag("match-detail-list"), contentPadding = detailListPadding(), verticalArrangement = Arrangement.spacedBy(HubSpace.md)) {
-        item { actions(match) }
+    val list = rememberLazyListState()
+    val compact by remember { derivedStateOf { list.firstVisibleItemIndex > 0 || list.firstVisibleItemScrollOffset > 120 } }
+    Column(Modifier.fillMaxSize()) {
+        Row(Modifier.fillMaxWidth().hubHeaderGradient().statusBarsPadding().height(56.dp), verticalAlignment = Alignment.CenterVertically) {
+            IconButton(back) { Icon(HubIcons.Back, "Wstecz") }
+            if (compact) Row(Modifier.weight(1f).testTag("match-compact-header"), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)) {
+                TeamEmblem(home, 32.dp)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(if (match.homeScore != null) "${match.homeScore} : ${match.awayScore}" else match.time, style = MaterialTheme.typography.titleSmall)
+                    MatchStatus(match.status)
+                }
+                TeamEmblem(away, 32.dp)
+            } else Text("Szczegóły meczu", style = MaterialTheme.typography.titleLarge)
+        }
+    LazyColumn(state = list, modifier = Modifier.weight(1f).testTag("match-detail-list"), contentPadding = detailListPadding(), verticalArrangement = Arrangement.spacedBy(HubSpace.sm)) {
         item {
             Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface) {
-                Column(Modifier.fillMaxWidth().padding(HubSpace.lg), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(HubSpace.lg)) {
-                    Text("${displayDate(match.date)} • Kolejka ${match.round}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Column(Modifier.fillMaxWidth().padding(HubSpace.lg), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(HubSpace.sm)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text("${displayDate(match.date)} • Kolejka ${match.round}", Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        actions(match)
+                    }
                     Text(data.leagues.first { it.id == match.leagueId }.name, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(HubSpace.sm)) {
                         Column(Modifier.weight(1f).clickable(role = Role.Button, onClickLabel = "Otwórz profil drużyny", onClick = { openTeam(home.id) }).testTag("match-home-team"), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(HubSpace.sm)) { TeamEmblem(home, 48.dp)
@@ -110,11 +128,9 @@ import java.time.LocalDate
                 }
             }
         }
-        item { MatchTimeline(match, data, openPlayer) }
-        item { Column(verticalArrangement = Arrangement.spacedBy(HubSpace.sm)) { content(match) } }
-        item {
+        stickyHeader {
             SecondaryTabRow(tab) {
-                listOf("Składy", "Tabela").forEachIndexed { index, label ->
+                listOf("Szczegóły", "Składy", "Tabela").forEachIndexed { index, label ->
                     Tab(tab == index, { scope.launch { pager.animateScrollToPage(index) } }, text = { Text(label) }, modifier = Modifier.testTag("match-tab-$index"))
                 }
             }
@@ -122,6 +138,11 @@ import java.time.LocalDate
         item {
             MeasuredContentPager(pager, Modifier.testTag("match-pages")) { page ->
                 if (page == 0) {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        MatchTimeline(match, data, openPlayer)
+                        content(match)
+                    }
+                } else if (page == 1) {
                     MatchLineups(match, data, openPlayer)
                 } else {
                     Column {
@@ -139,4 +160,5 @@ import java.time.LocalDate
             }
         }
     }
+}
 }

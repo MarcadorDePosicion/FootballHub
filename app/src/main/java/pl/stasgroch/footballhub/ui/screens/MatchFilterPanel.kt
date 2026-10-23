@@ -13,7 +13,7 @@ import pl.stasgroch.footballhub.data.model.FootballData
 private val statuses = listOf("ALL" to "Wszystkie", "SCHEDULED" to "Nadchodzące", "FINISHED" to "Zakończone")
 
 @OptIn(ExperimentalLayoutApi::class)
-@Composable fun MatchFilterPanel(data: FootballData, filters: MatchFilters) {
+@Composable fun MatchFilterPanel(data: FootballData, filters: MatchFilters, pager: androidx.compose.foundation.pager.PagerState, anchor: Long) {
     var show by rememberSaveable { mutableStateOf(false) }
     var league by rememberSaveable { mutableIntStateOf(0) }
     var status by rememberSaveable { mutableStateOf("ALL") }
@@ -23,7 +23,7 @@ private val statuses = listOf("ALL" to "Wszystkie", "SCHEDULED" to "Nadchodzące
         OutlinedButton(onClick = { league = filters.league; status = filters.status; chronological = filters.chronological; show = true }) {
             Text(if (count == 0) "Filtry" else "Filtry ($count)")
         }
-        MatchDateSelector(filters, Modifier.weight(1f))
+        MatchDateSelector(filters, pager, anchor, Modifier.weight(1f))
     }
     if (count > 0) TextButton(onClick = { filters.league = 0; filters.status = "ALL" }) { Text("Wyczyść") }
     if (count > 0) Text(
