@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic import SecretStr, field_validator, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
@@ -16,7 +16,8 @@ class Settings(BaseSettings):
     env: Literal["development", "test", "production"] = "development"
     database_url: str = f"sqlite:///{(BACKEND_DIR / 'footballhub.db').as_posix()}"
     jwt_secret_key: SecretStr = SecretStr(DEVELOPMENT_SECRET)
-    jwt_algorithm: str = "HS256"
+    jwt_algorithm: Literal["HS256"] = "HS256"
+    jwt_access_token_expire_minutes: int = Field(default=60, gt=0)
     football_data_api_key: SecretStr = SecretStr("")
     football_data_mode: Literal["demo", "live"] = "demo"
 
@@ -33,4 +34,6 @@ class Settings(BaseSettings):
         secret = self.jwt_secret_key.get_secret_value().strip()
         if self.env == "production" and (not secret or secret == DEVELOPMENT_SECRET):
             raise ValueError("Production requires a non-placeholder JWT_SECRET_KEY")
+        if self.env == "production" and len(secret.encode("utf-8")) < 32:
+            raise ValueError("Production requires JWT_SECRET_KEY of at least 32 bytes")
         return self

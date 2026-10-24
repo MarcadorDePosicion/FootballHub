@@ -18,8 +18,9 @@ def settings():
         _env_file=None,
         env="test",
         database_url="sqlite:///:memory:",
-        jwt_secret_key="test-only-placeholder",
+        jwt_secret_key="test-only-placeholder-at-least-32-bytes",
         jwt_algorithm="HS256",
+        jwt_access_token_expire_minutes=60,
         football_data_api_key="",
         football_data_mode="demo",
     )

@@ -7,7 +7,9 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from .config import Settings
-from .database import Database, get_db
+from .database import Base, Database, get_db
+from . import models  # Register tables before lifespan calls create_all.
+from .routers.auth import router as auth_router
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -19,11 +21,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         application.state.settings = configuration
         application.state.database = database
         try:
+            Base.metadata.create_all(bind=database.engine)
             yield
         finally:
             database.engine.dispose()
 
     application = FastAPI(title="Football Hub API", lifespan=lifespan)
+    application.include_router(auth_router)
 
     @application.get("/api/health", responses={503: {"description": "Database unavailable"}})
     def health(db: Session = Depends(get_db)):

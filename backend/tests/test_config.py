@@ -45,6 +45,36 @@ def test_default_development_database_is_sqlite():
     assert Settings(_env_file=None).database_url.startswith("sqlite:///")
 
 
+@pytest.mark.parametrize("algorithm", ["none", "HS384", "RS256", "invalid"])
+def test_unsupported_jwt_algorithm(monkeypatch, algorithm):
+    monkeypatch.setenv("JWT_ALGORITHM", algorithm)
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)
+
+
+@pytest.mark.parametrize("minutes", ["0", "-1"])
+def test_nonpositive_token_lifetime(monkeypatch, minutes):
+    monkeypatch.setenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", minutes)
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)
+
+
+def test_positive_token_lifetime_from_environment(monkeypatch):
+    monkeypatch.setenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "15")
+    assert Settings(_env_file=None).jwt_access_token_expire_minutes == 15
+
+
+@pytest.mark.parametrize("secret", ["a" * 31, "ą" * 15])
+def test_production_requires_32_byte_secret(secret):
+    with pytest.raises(ValidationError, match="at least 32 bytes"):
+        Settings(_env_file=None, env="production", jwt_secret_key=secret)
+
+
+@pytest.mark.parametrize("secret", ["a" * 32, "ą" * 16])
+def test_production_secret_length_is_in_bytes(secret):
+    assert Settings(_env_file=None, env="production", jwt_secret_key=secret).env == "production"
+
+
 def test_import_and_test_app_ignore_invalid_dotenv(tmp_path):
     bad_env = tmp_path / ".env"
     bad_env.write_text("ENV=production\nDATABASE_URL=invalid\nJWT_SECRET_KEY=development-only-change-me\n", encoding="utf-8")
