@@ -1,0 +1,1 @@
+"""Football Hub backend skeleton."""
