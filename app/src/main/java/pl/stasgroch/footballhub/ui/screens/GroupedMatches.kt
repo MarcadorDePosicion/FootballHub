@@ -17,13 +17,15 @@ fun LazyListScope.groupedMatches(key: String, matches: List<Match>, data: Footba
     matches.groupBy { it.leagueId }.forEach { (league, games) ->
         item(key = "$key-league-$league") {
             Surface(shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp), modifier = Modifier.padding(top = 8.dp)) {
-                Text(data.leagues.first { it.id == league }.name, Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+                Text(data.league(league)?.name ?: "Liga niedostępna w aktualnie załadowanych danych", Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
                     style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
             }
         }
         games.forEachIndexed { index, match ->
             item(key = "$key-match-${match.id}") {
-                Surface(onClick = { openMatch(match.id) }, shape = RoundedCornerShape(
+                Surface(onClick = { openMatch(match.id) },
+                    enabled = data.team(match.homeId) != null && data.team(match.awayId) != null && data.league(match.leagueId) != null,
+                    shape = RoundedCornerShape(
                     bottomStart = if (index == games.lastIndex) 16.dp else 0.dp,
                     bottomEnd = if (index == games.lastIndex) 16.dp else 0.dp)) {
                     Column {
@@ -37,12 +39,18 @@ fun LazyListScope.groupedMatches(key: String, matches: List<Match>, data: Footba
 }
 
 @Composable private fun CompactMatchRow(match: Match, data: FootballData) {
+    val home = data.team(match.homeId)
+    val away = data.team(match.awayId)
+    if (home == null || away == null || data.league(match.leagueId) == null) {
+        EmptyState("Niepełne dane meczu — drużyna lub liga niedostępna.")
+        return
+    }
     val finished = match.status == "FINISHED"
     val scheduled = match.status == "SCHEDULED"
     Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            listOf(data.team(match.homeId) to match.homeScore, data.team(match.awayId) to match.awayScore).forEachIndexed { index, (team, score) ->
+            listOf(home to match.homeScore, away to match.awayScore).forEachIndexed { index, (team, score) ->
                 val other = if (index == 0) match.awayScore else match.homeScore
                 val winner = finished && score != null && other != null && score > other
                 val loser = finished && score != null && other != null && score < other

@@ -39,7 +39,7 @@ import pl.stasgroch.footballhub.ui.theme.HubSpace
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable fun StandingsScreen(id: Int, data: FootballData, favorites: Set<Int> = emptySet(),
     openMatch: (Int) -> Unit = {}, back: (() -> Unit)? = null, openTeam: (Int) -> Unit) {
-    val league = data.leagues.find { it.id == id }
+    val league = data.league(id)
     if (league == null) { EmptyState("Nie znaleziono ligi."); return }
     val pager = rememberPagerState { 2 }
     val scope = rememberCoroutineScope()
@@ -91,7 +91,7 @@ import pl.stasgroch.footballhub.ui.theme.HubSpace
     openTeam: (Int) -> Unit = {}, back: () -> Unit = {}, highlightedPlayerId: Int? = null, openPlayer: (Int) -> Unit = {}, openLeague: (Int) -> Unit = {}, favorite: @Composable (Team) -> Unit = {}) {
     val team = data.teams.find { it.id == id }
     if (team == null) { EmptyState("Nie znaleziono drużyny."); return }
-    val league = data.leagues.find { it.id == team.leagueId }
+    val league = data.league(team.leagueId)
     val pager = rememberPagerState(initialPage = if (highlightedPlayerId != null) 3 else 0) { 4 }
     val scope = rememberCoroutineScope()
     val tab = pager.currentPage
@@ -147,7 +147,7 @@ import pl.stasgroch.footballhub.ui.theme.HubSpace
                             }
                         }
                         val rows = data.standings.filter { it.leagueId == team.leagueId }.sortedByDescending { it.points }
-                        if (rows.isEmpty()) item { EmptyState("Tabela tej ligi nie jest jeszcze dostępna.") }
+                        if (league == null || rows.isEmpty()) item { EmptyState("Tabela tej ligi nie jest jeszcze dostępna.") }
                         else item { StandingsTable(rows, data, emptySet(), openTeam, highlightedTeamId = id) }
                     }
                     2 -> {

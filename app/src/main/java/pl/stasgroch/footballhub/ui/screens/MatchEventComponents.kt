@@ -60,9 +60,11 @@ private fun shortName(name: String): String {
             if (record.demo) Text("DEMO • przykładowe zdarzenia", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
             if (record.coverage == EventCoverage.PARTIAL) Text("Dostępny jest tylko fragment przebiegu meczu.", style = MaterialTheme.typography.labelSmall)
             if (record.events.isEmpty()) Text("Brak zarejestrowanych zdarzeń.", style = MaterialTheme.typography.bodySmall)
+            if (record.events.any { it.teamId != match.homeId && it.teamId != match.awayId })
+                Text("Pominięto zdarzenia z nieznanym powiązaniem drużyny.", style = MaterialTheme.typography.labelSmall)
             Surface(shape = MaterialTheme.shapes.large) {
                 Column(Modifier.fillMaxWidth().padding(8.dp)) {
-                    data.eventsFor(match.id).asReversed().forEach { event ->
+                    data.eventsFor(match.id).filter { it.teamId == match.homeId || it.teamId == match.awayId }.asReversed().forEach { event ->
                         val away = event.teamId == match.awayId
                         Row(Modifier.fillMaxWidth().padding(start = if (away) 28.dp else 0.dp, end = if (away) 0.dp else 28.dp)
                             .heightIn(min = 48.dp).testTag("event-${event.id}"), verticalAlignment = Alignment.CenterVertically,

@@ -9,6 +9,24 @@ import pl.stasgroch.footballhub.data.model.*
 import pl.stasgroch.footballhub.data.remote.*
 
 class FootballDataTest {
+    @Test fun teamAndLeagueLookupsRepresentMissingReferencesExplicitly() {
+        val data = DemoData.create()
+        assertEquals(data.teams.first(), data.team(data.teams.first().id))
+        assertEquals(data.leagues.first(), data.league(data.leagues.first().id))
+        assertNull(data.team(Int.MAX_VALUE))
+        assertNull(data.league(Int.MAX_VALUE))
+        assertNull(FootballData().team(1))
+        assertNull(FootballData().league(1))
+    }
+
+    @Test fun allDemoMatchReferencesStillResolve() {
+        val data = DemoData.create()
+        data.matches.forEach { match ->
+            assertNotNull(data.team(match.homeId))
+            assertNotNull(data.team(match.awayId))
+            assertNotNull(data.league(match.leagueId))
+        }
+    }
     @Test fun lineupsHaveElevenDistinctPlayersFromTheCorrectTeam() {
         val data = Gson().fromJson(Gson().toJson(DemoData.create()), FootballData::class.java)
         assertEquals(data.players.size, data.players.map { it.id }.distinct().size)

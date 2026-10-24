@@ -65,8 +65,11 @@ import pl.stasgroch.footballhub.data.model.*
         filtered.groupBy { it.matchId }.forEach { (matchId, matchEntries) ->
             item(key = "match-$matchId") {
                 val match = data.matches.find { it.id == matchId }
-                TextButton({ openMatch(matchId) }, Modifier.testTag("journal-match-$matchId")) {
-                    Text(match?.let { "${data.team(it.homeId).shortName} – ${data.team(it.awayId).shortName}" } ?: "Mecz #$matchId")
+                val home = match?.let { data.team(it.homeId) }
+                val away = match?.let { data.team(it.awayId) }
+                val available = home != null && away != null && match?.let { data.league(it.leagueId) } != null
+                TextButton({ openMatch(matchId) }, Modifier.testTag("journal-match-$matchId"), enabled = available) {
+                    Text(if (available) "${home?.shortName} – ${away?.shortName}" else "Mecz niedostępny w aktualnie załadowanych danych")
                 }
             }
             items(matchEntries, key = { it.id }) { entry -> EntryCard(entry, { edit(entry) }, { delete(entry.id) }) }
@@ -75,6 +78,11 @@ import pl.stasgroch.footballhub.data.model.*
 }
 @Composable fun EntryFormScreen(match: Match?, data: FootballData, kind: String, existing: JournalEntry?, missingEntry: Boolean, saving: Boolean, save: (String, String, String) -> Unit, cancel: () -> Unit) {
     if (match == null || missingEntry) { EmptyState("Nie znaleziono meczu lub wpisu."); return }
+    val homeTeam = data.team(match.homeId)
+    val awayTeam = data.team(match.awayId)
+    if (homeTeam == null || awayTeam == null || data.league(match.leagueId) == null) {
+        EmptyState("Mecz niedostępny w aktualnie załadowanych danych"); return
+    }
     var text by rememberSaveable(existing?.id, match.id, kind) { mutableStateOf(existing?.text ?: "") }
     var home by rememberSaveable(existing?.id, match.id, kind) { mutableStateOf(existing?.homeScore?.toString() ?: "") }
     var away by rememberSaveable(existing?.id, match.id, kind) { mutableStateOf(existing?.awayScore?.toString() ?: "") }
@@ -91,17 +99,17 @@ import pl.stasgroch.footballhub.data.model.*
     Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface) {
             Column(Modifier.fillMaxWidth().padding(HubSpace.md), verticalArrangement = Arrangement.spacedBy(HubSpace.sm)) {
-                listOf(data.team(match.homeId), data.team(match.awayId)).forEach { team ->
+                listOf(homeTeam, awayTeam).forEach { team ->
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(HubSpace.sm)) { TeamEmblem(team); Text(team.name, style = MaterialTheme.typography.titleSmall) }
                 }
                 Text("${displayDate(match.date)} • ${match.time}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         if (kind == "PREDICTION") Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedTextField(home, { home = it; error = null }, label = { Text(data.team(match.homeId).shortName) }, singleLine = true,
+            OutlinedTextField(home, { home = it; error = null }, label = { Text(homeTeam.shortName) }, singleLine = true,
                 shape = MaterialTheme.shapes.medium, isError = error != null && home.toIntOrNull() !in 0..99,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
-            OutlinedTextField(away, { away = it; error = null }, label = { Text(data.team(match.awayId).shortName) }, singleLine = true,
+            OutlinedTextField(away, { away = it; error = null }, label = { Text(awayTeam.shortName) }, singleLine = true,
                 shape = MaterialTheme.shapes.medium, isError = error != null && away.toIntOrNull() !in 0..99,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
         }
@@ -131,6 +139,9 @@ import pl.stasgroch.footballhub.data.model.*
             }
         }
         if (selected == 1) {
+            if (favoritePlayers.any { id -> data.players.none { it.id == id } }) item {
+                EmptyState("Część ulubionych zawodników jest niedostępna w aktualnie załadowanych danych. Zapisane ulubione zostały zachowane.", HubIcons.Star)
+            }
             if (favoritePlayers.isEmpty() && favorites.isNotEmpty()) item {
                 EmptyState("Nie masz jeszcze ulubionych zawodników. Dodaj zawodnika gwiazdką na jego profilu.", HubIcons.Star)
             }
@@ -148,6 +159,9 @@ import pl.stasgroch.footballhub.data.model.*
         }
         if (selected == 0 && favorites.isEmpty() && favoritePlayers.isNotEmpty()) item {
             EmptyState("Nie masz jeszcze ulubionych drużyn. Dodaj drużynę gwiazdką na jej profilu.", HubIcons.Star)
+        }
+        if (selected == 0 && favorites.any { data.team(it) == null }) item {
+            EmptyState("Część ulubionych drużyn jest niedostępna w aktualnie załadowanych danych. Zapisane ulubione zostały zachowane.", HubIcons.Star)
         }
         if (selected == 0) items(data.teams.filter { it.id in favorites }, key = { it.id }) { team ->
             Card(onClick = { openTeam(team.id) }, modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {

@@ -83,6 +83,11 @@ import java.time.LocalDate
     if (match == null) { EmptyState("Nie znaleziono meczu."); return }
     val home = data.team(match.homeId)
     val away = data.team(match.awayId)
+    val league = data.league(match.leagueId)
+    if (home == null || away == null || league == null) {
+        EmptyState("Niepełne dane meczu — drużyna lub liga niedostępna.")
+        return
+    }
     val pager = rememberPagerState { 3 }
     val scope = rememberCoroutineScope()
     val tab = pager.currentPage
@@ -111,7 +116,7 @@ import java.time.LocalDate
                         }
                         Row(Modifier.align(Alignment.CenterEnd)) { actions(match) }
                     }
-                    Text(data.leagues.first { it.id == match.leagueId }.name, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
+                    Text(league.name, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary)
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(HubSpace.sm)) {
                         Column(Modifier.weight(1f).clickable(role = Role.Button, onClickLabel = "Otwórz profil drużyny", onClick = { openTeam(home.id) }).testTag("match-home-team"), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(HubSpace.sm)) { TeamEmblem(home, 48.dp)
                             Text(home.name, textAlign = TextAlign.Center, style = MaterialTheme.typography.titleSmall)

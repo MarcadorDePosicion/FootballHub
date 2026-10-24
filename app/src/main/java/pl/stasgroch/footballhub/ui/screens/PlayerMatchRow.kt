@@ -12,17 +12,24 @@ import androidx.compose.ui.unit.dp
 import pl.stasgroch.footballhub.data.model.*
 
 @Composable fun PlayerMatchRow(match: Match, data: FootballData, playerId: Int, teamId: Int?, unusedBench: Boolean, open: () -> Unit) {
+    val home = data.team(match.homeId)
+    val away = data.team(match.awayId)
+    val league = data.league(match.leagueId)
+    if (home == null || away == null || league == null) {
+        EmptyState("Niepełne dane meczu — drużyna lub liga niedostępna.")
+        return
+    }
     Card(onClick = open, modifier = Modifier.fillMaxWidth().testTag("appearance-${match.id}")) {
         Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text("${displayDate(match.date)} • ${data.leagues.find { it.id == match.leagueId }?.name.orEmpty()}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("${displayDate(match.date)} • ${league.name}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            listOf(match.homeId to match.homeScore, match.awayId to match.awayScore).forEach { (id, score) ->
-                val opponentScore = if (id == match.homeId) match.awayScore else match.homeScore
+            listOf(home to match.homeScore, away to match.awayScore).forEach { (team, score) ->
+                val opponentScore = if (team.id == match.homeId) match.awayScore else match.homeScore
                 val won = score != null && opponentScore != null && score > opponentScore
                 Row(Modifier.fillMaxWidth().heightIn(min = 28.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    TeamEmblem(data.team(id), 22.dp)
-                    Text(data.team(id).name, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall,
+                    TeamEmblem(team, 22.dp)
+                    Text(team.name, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall,
                         fontWeight = if (won) FontWeight.Bold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis,
                         color = if (won) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
                 }

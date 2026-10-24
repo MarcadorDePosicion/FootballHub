@@ -58,6 +58,13 @@ import pl.stasgroch.footballhub.ui.theme.HubSpace
                     }
                     rows.forEachIndexed { index, standing ->
                         val team = data.team(standing.teamId)
+                        if (team == null || data.league(standing.leagueId) == null) {
+                            Row(Modifier.fillMaxWidth().padding(HubSpace.md)) {
+                                Text((index + 1).toString(), Modifier.width(positionWidth))
+                                Text("Dane drużyny lub ligi są niedostępne.", Modifier.weight(1f))
+                            }
+                            return@forEachIndexed
+                        }
                         val favorite = team.id in favorites
                         val highlighted = team.id == highlightedTeamId || team.id in highlightedTeamIds
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .5f))

@@ -69,16 +69,23 @@ fun statusLabel(status: String): String = when (status) {
         style = MaterialTheme.typography.labelSmall, color = color, maxLines = 1)
 }
 @Composable fun MatchCard(match: Match, data: FootballData, onClick: () -> Unit) {
+    val home = data.team(match.homeId)
+    val away = data.team(match.awayId)
+    val league = data.league(match.leagueId)
+    if (home == null || away == null || league == null) {
+        EmptyState("Niepełne dane meczu — drużyna lub liga niedostępna.")
+        return
+    }
     Card(onClick = onClick, shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(HubSpace.md), verticalArrangement = Arrangement.spacedBy(HubSpace.xs)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(data.leagues.first { it.id == match.leagueId }.name, Modifier.weight(1f),
+                Text(league.name, Modifier.weight(1f),
                     style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 MatchStatus(match.status)
             }
-            listOf(data.team(match.homeId) to match.homeScore, data.team(match.awayId) to match.awayScore).forEach { (team, score) ->
+            listOf(home to match.homeScore, away to match.awayScore).forEach { (team, score) ->
                 Row(Modifier.fillMaxWidth().heightIn(min = 30.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(HubSpace.sm)) {
                     TeamEmblem(team)
                     Text(team.name, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)

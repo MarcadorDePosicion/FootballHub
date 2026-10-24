@@ -98,6 +98,7 @@ fun LazyListScope.playerRoster(players: List<Player>, highlightedId: Int? = null
 @Composable private fun LineupTeam(match: Match, data: FootballData, teamId: Int,
     events: List<MatchEvent>, openPlayer: (Int) -> Unit) {
     val team = data.team(teamId)
+    if (team == null) { EmptyState("Drużyna niedostępna w aktualnie załadowanych danych."); return }
     val lineup = data.lineups.find { it.matchId == match.id && it.teamId == teamId }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             TeamEmblem(team, 32.dp)
@@ -124,6 +125,8 @@ fun LazyListScope.playerRoster(players: List<Player>, highlightedId: Int? = null
             }
             Text("Rezerwowi", style = MaterialTheme.typography.titleSmall)
             val bench = lineup.substitutes.orEmpty().mapNotNull { id -> data.players.find { it.id == id } }
+            if (bench.size < lineup.substitutes.orEmpty().size && bench.isNotEmpty())
+                Text("Dostępna jest tylko część zawodników rezerwowych.", style = MaterialTheme.typography.bodySmall)
             if (bench.isEmpty()) Text("Lista rezerwowych nie jest dostępna.", style = MaterialTheme.typography.bodySmall)
             bench.forEach { PlayerRow(it, openPlayer = openPlayer, events = events, players = data.players) }
             if (events.isNotEmpty()) EventLegend()

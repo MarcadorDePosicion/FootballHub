@@ -28,6 +28,7 @@ data class MatchLineup(val matchId: Int, val teamId: Int, val formation: String?
 data class FootballData(val teams: List<Team> = emptyList(), val leagues: List<League> = emptyList(), val matches: List<Match> = emptyList(), val standings: List<Standing> = emptyList(),
     val players: List<Player> = emptyList(), val lineups: List<MatchLineup> = emptyList(),
     val matchEvents: List<MatchEvents> = emptyList(), val appearances: List<PlayerAppearance> = emptyList()) {
-    fun team(id: Int) = teams.first { it.id == id }
+    fun team(id: Int): Team? = teams.firstOrNull { it.id == id }
+    fun league(id: Int): League? = leagues.firstOrNull { it.id == id }
 }
 
