@@ -73,7 +73,7 @@ import pl.stasgroch.footballhub.ui.theme.HubSpace
                 modifier = Modifier.pageSemantics(pager, page).fillMaxSize().testTag(if (page == pager.currentPage) "league-list" else "league-list-$page"),
                 contentPadding = detailListPadding(), verticalArrangement = Arrangement.spacedBy(if (page == 0) 8.dp else 0.dp)) {
                 if (page == 0) {
-                    item { StandingsTable(data.standings.filter { it.leagueId == id }.sortedByDescending { it.points }, data, favorites, openTeam) }
+                    item { StandingsTable(data.standings.filter { it.leagueId == id }.orderedStandings(), data, favorites, openTeam) }
                     item { Text("M — mecze   B — bramki   Pkt — punkty", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     item { Text("Fragment tabeli demonstracyjnej • dotknij drużyny, aby otworzyć profil.",
                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
@@ -146,7 +146,7 @@ import pl.stasgroch.footballhub.ui.theme.HubSpace
                                 Text("Wyróżniona drużyna: ${team.name}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
-                        val rows = data.standings.filter { it.leagueId == team.leagueId }.sortedByDescending { it.points }
+                        val rows = data.standings.filter { it.leagueId == team.leagueId }.orderedStandings()
                         if (league == null || rows.isEmpty()) item { EmptyState("Tabela tej ligi nie jest jeszcze dostępna.") }
                         else item { StandingsTable(rows, data, emptySet(), openTeam, highlightedTeamId = id) }
                     }

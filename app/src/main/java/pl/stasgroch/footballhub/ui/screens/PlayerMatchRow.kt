@@ -39,7 +39,7 @@ import pl.stasgroch.footballhub.data.model.*
                 Box(Modifier.size(36.dp), contentAlignment = Alignment.Center) {
                     if (unusedBench) BenchSymbol() else {
                         val minutes = data.appearances.find { it.matchId == match.id && it.playerId == playerId }
-                            ?.playedMinutes(data.matchEvents.find { it.matchId == match.id }, match.status == "FINISHED")
+                            ?.playedMinutes(data.matchEvents.find { it.matchId == match.id }, match.matchStatus.isPlayed)
                         Text(minutes?.let { "$it′" } ?: "—", style = MaterialTheme.typography.labelSmall)
                     }
                 }

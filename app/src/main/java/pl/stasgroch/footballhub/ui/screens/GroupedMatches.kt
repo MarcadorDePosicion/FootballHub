@@ -45,8 +45,8 @@ fun LazyListScope.groupedMatches(key: String, matches: List<Match>, data: Footba
         EmptyState("Niepełne dane meczu — drużyna lub liga niedostępna.")
         return
     }
-    val finished = match.status == "FINISHED"
-    val scheduled = match.status == "SCHEDULED"
+    val finished = match.matchStatus.isFinished
+    val scheduled = match.matchStatus.isScheduled
     Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {

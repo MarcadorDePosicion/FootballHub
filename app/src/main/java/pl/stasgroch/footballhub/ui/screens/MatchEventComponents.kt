@@ -109,7 +109,8 @@ private fun shortName(name: String): String {
     when (event.kind) {
         EventKind.GOAL -> FootballSymbol(event.goalKind == GoalKind.OWN_GOAL)
         EventKind.SUBSTITUTION -> Text("⇄", color = MaterialTheme.colorScheme.secondary)
-        EventKind.CARD -> CardSymbol(event.cardKind ?: CardKind.YELLOW)
+        EventKind.CARD -> CardSymbol(event.cardKind)
+        null -> UnknownEventSymbol()
     }
 }
 

@@ -28,12 +28,7 @@ fun displayDate(value: String): String = runCatching {
     LocalDate.parse(value).format(DateTimeFormatter.ofPattern("d MMM", Locale.forLanguageTag("pl")))
 }.getOrDefault(value)
 
-fun statusLabel(status: String): String = when (status) {
-    "FINISHED" -> "Koniec"
-    "LIVE", "IN_PLAY", "IN_PROGRESS" -> "Trwa"
-    "SCHEDULED" -> "Planowany"
-    else -> "Status: $status"
-}
+fun statusLabel(status: String): String = MatchStatusKind.from(status).label
 
 @Composable fun SectionTitle(title: String, subtitle: String? = null) {
     Column(Modifier.padding(top = HubSpace.sm, bottom = HubSpace.xs), verticalArrangement = Arrangement.spacedBy(HubSpace.xs)) {
@@ -63,7 +58,7 @@ fun statusLabel(status: String): String = when (status) {
     }
 }
 @Composable fun MatchStatus(status: String) {
-    val active = status in listOf("LIVE", "IN_PLAY", "IN_PROGRESS")
+    val active = MatchStatusKind.from(status).isLive
     val color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
     Text(if (active) "● ${statusLabel(status)}" else statusLabel(status),
         style = MaterialTheme.typography.labelSmall, color = color, maxLines = 1)

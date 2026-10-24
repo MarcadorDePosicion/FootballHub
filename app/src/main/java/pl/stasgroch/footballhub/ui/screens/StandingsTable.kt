@@ -29,6 +29,8 @@ import pl.stasgroch.footballhub.ui.theme.HubSpace
         color = if (emphasis) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
 }
 @Composable fun StandingsTable(rows: List<Standing>, data: FootballData, favorites: Set<Int>, openTeam: (Int) -> Unit, highlightedTeamId: Int? = null, highlightedTeamIds: Set<Int> = emptySet()) {
+    val orderedRows = rows.orderedStandings()
+    val officialPositions = rows.hasOfficialPositions()
     val scale = LocalDensity.current.fontScale.coerceAtLeast(1f)
     val positionWidth = 26.dp * scale
     val playedWidth = 32.dp * scale
@@ -56,11 +58,12 @@ import pl.stasgroch.footballhub.ui.theme.HubSpace
                         NumberCell("B", goalsWidth)
                         NumberCell("Pkt", pointsWidth)
                     }
-                    rows.forEachIndexed { index, standing ->
+                    orderedRows.forEachIndexed { index, standing ->
+                        val position = if (officialPositions) standing.position else index + 1
                         val team = data.team(standing.teamId)
                         if (team == null || data.league(standing.leagueId) == null) {
                             Row(Modifier.fillMaxWidth().padding(HubSpace.md)) {
-                                Text((index + 1).toString(), Modifier.width(positionWidth))
+                                Text(position.toString(), Modifier.width(positionWidth))
                                 Text("Dane drużyny lub ligi są niedostępne.", Modifier.weight(1f))
                             }
                             return@forEachIndexed
@@ -72,8 +75,8 @@ import pl.stasgroch.footballhub.ui.theme.HubSpace
                             modifier = Modifier.testTag("standing-${team.id}").semantics { selected = highlighted },
                             color = if (highlighted) MaterialTheme.colorScheme.primaryContainer else if (favorite) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = .45f) else MaterialTheme.colorScheme.surface) {
                             Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(horizontal = HubSpace.md, vertical = HubSpace.sm), verticalAlignment = Alignment.CenterVertically) {
-                                Text((index + 1).toString(), Modifier.width(positionWidth), style = MaterialTheme.typography.labelMedium,
-                                    color = if (index == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(position.toString(), Modifier.width(positionWidth), style = MaterialTheme.typography.labelMedium,
+                                    color = if (position == 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                                 Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(HubSpace.sm)) {
                                     TeamEmblem(team, 24.dp)
                                     Text(team.name, Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium,
@@ -82,7 +85,7 @@ import pl.stasgroch.footballhub.ui.theme.HubSpace
                                 }
                                 NumberCell(standing.played.toString(), playedWidth)
                                 NumberCell("${standing.goalsFor}:${standing.goalsAgainst}", goalsWidth)
-                                NumberCell(standing.points.toString(), pointsWidth, true)
+                                NumberCell(standing.displayPoints.toString(), pointsWidth, true)
                             }
                         }
                     }

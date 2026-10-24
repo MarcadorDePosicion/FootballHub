@@ -33,7 +33,7 @@ object DemoMatchEvents {
 
     fun appearances(matches: List<Match>, lineups: List<MatchLineup>): List<PlayerAppearance> {
         val events = create().associateBy { it.matchId }
-        return lineups.filter { lineup -> matches.any { it.id == lineup.matchId && it.status == "FINISHED" } }
+        return lineups.filter { lineup -> matches.any { it.id == lineup.matchId && it.matchStatus.isPlayed } }
             .flatMap { lineup ->
                 val starters = lineup.starterRows.orEmpty().flatten()
                 val entered = events[lineup.matchId]?.events.orEmpty()

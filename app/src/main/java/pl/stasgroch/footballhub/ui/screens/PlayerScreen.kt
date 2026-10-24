@@ -99,7 +99,7 @@ import java.time.format.DateTimeFormatter
                         id in lineup.substitutes.orEmpty() && lineup.matchId !in appearances &&
                             data.matchEvents.any { it.matchId == lineup.matchId && it.coverage == EventCoverage.COMPLETE }
                     }.associateBy { it.matchId }
-                    val matches = data.matches.filter { it.id in appearances || (it.status == "FINISHED" && it.id in unusedBench) }
+                    val matches = data.matches.filter { it.id in appearances || (it.matchStatus.isPlayed && it.id in unusedBench) }
                         .sortedByDescending { it.date + it.time }
                     if (matches.isEmpty()) item { EmptyState("Brak dostępnej historii występów.") }
                     items(matches, key = { it.id }) { match ->

@@ -24,7 +24,7 @@ import java.time.LocalDate
 
 @Composable fun HomeScreen(data: FootballData, listState: LazyListState, openMatch: (Int) -> Unit) {
     val today = data.matches.filter { it.date == LocalDate.now().toString() }.sortedBy { it.time }
-    val recent = data.matches.filter { it.status == "FINISHED" }.sortedWith(compareByDescending<Match> { it.date }.thenByDescending { it.time })
+    val recent = data.matches.filter { it.matchStatus.isFinished }.sortedWith(compareByDescending<Match> { it.date }.thenByDescending { it.time })
     LazyColumn(state = listState, modifier = Modifier.testTag("match-list"), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp)) {
         item { Text("FOOTBALL HUB • lokalny mock, bez danych na żywo", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         item { SectionTitle("Mecze dnia", "${displayDate(LocalDate.now().toString())} • Spotkania: ${today.size}") }
@@ -49,7 +49,7 @@ import java.time.LocalDate
     }
     val count = data.matches.count {
         it.date == filters.date && (filters.league == 0 || it.leagueId == filters.league) &&
-            (filters.status == "ALL" || it.status == filters.status)
+            it.matchesStatusFilter(filters.status)
     }
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.padding(horizontal = 16.dp)) {
@@ -64,7 +64,7 @@ import java.time.LocalDate
             }
             val filtered = data.matches.filter {
                 it.date == date && (filters.league == 0 || it.leagueId == filters.league) &&
-                    (filters.status == "ALL" || it.status == filters.status)
+                    it.matchesStatusFilter(filters.status)
             }.sortedBy { it.time }
             LazyColumn(state = pageList, modifier = Modifier.pageSemantics(pager, page).fillMaxSize()
                 .testTag(if (page == pager.currentPage) "match-list" else "match-list-$page"),
@@ -111,7 +111,7 @@ import java.time.LocalDate
             Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surface) {
                 Column(Modifier.fillMaxWidth().padding(HubSpace.lg), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(HubSpace.sm)) {
                     Box(Modifier.fillMaxWidth().heightIn(min = 48.dp), contentAlignment = Alignment.Center) {
-                        Surface(modifier = Modifier.padding(horizontal = if (match.status == "FINISHED") 48.dp else 88.dp), shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceVariant) {
+                        Surface(modifier = Modifier.padding(horizontal = if (!match.matchStatus.canPredict) 48.dp else 88.dp), shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceVariant) {
                             Text("${displayDate(match.date)} • ${match.time}", Modifier.padding(horizontal = 8.dp, vertical = 6.dp), style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center)
                         }
                         Row(Modifier.align(Alignment.CenterEnd)) { actions(match) }
@@ -132,7 +132,7 @@ import java.time.LocalDate
                     }
                     MatchScorers(match, data, openPlayer)
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                    Text("Stadion: ${home.stadium}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+                    Text("Stadion: ${match.venueLabel}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
                 }
             }
         }
@@ -160,7 +160,7 @@ import java.time.LocalDate
                             Text("Zobacz ligę", style = MaterialTheme.typography.labelSmall)
                             Icon(HubIcons.Next, null)
                         }
-                        val rows = data.standings.filter { it.leagueId == match.leagueId }.sortedByDescending { it.points }
+                        val rows = data.standings.filter { it.leagueId == match.leagueId }.orderedStandings()
                         if (rows.isEmpty()) EmptyState("Tabela tej ligi nie jest jeszcze dostępna.")
                         else StandingsTable(rows, data, emptySet(), openTeam, highlightedTeamIds = setOf(home.id, away.id))
                     }

@@ -142,7 +142,7 @@ import pl.stasgroch.footballhub.ui.theme.hubHeaderGradient
                     MatchDetailsScreen(it.arguments?.getString("id")?.toIntOrNull() ?: -1, data, { id -> nav.navigate("team/$id") }, { id -> nav.navigate("league/$id") }, openPlayer = { id -> nav.navigate("player/$id") }, back = { nav.popBackStack() }, actions = { match ->
                         Row {
                             IconButton({ nav.navigate("form/${match.id}/NOTE/new") }) { Icon(HubIcons.Notes, "Dodaj notatkę", tint = MaterialTheme.colorScheme.primary) }
-                            if (match.status != "FINISHED") IconButton({ nav.navigate("form/${match.id}/PREDICTION/new") }) { Icon(HubIcons.Matches, "Dodaj typ wyniku", tint = MaterialTheme.colorScheme.secondary) }
+                            if (match.matchStatus.canPredict) IconButton({ nav.navigate("form/${match.id}/PREDICTION/new") }) { Icon(HubIcons.Matches, "Dodaj typ wyniku", tint = MaterialTheme.colorScheme.secondary) }
                         }
                     }) { match ->
                         val own = entries.filter { e -> e.matchId == match.id }

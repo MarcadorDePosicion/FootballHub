@@ -30,7 +30,13 @@ import pl.stasgroch.footballhub.data.model.*
     }
 }
 
-@Composable fun CardSymbol(kind: CardKind) {
+@Composable fun UnknownEventSymbol() {
+    Text("?", modifier = Modifier.size(20.dp).semantics { contentDescription = "Nieznane zdarzenie" },
+        color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+@Composable fun CardSymbol(kind: CardKind?) {
+    if (kind == null) { UnknownEventSymbol(); return }
     Canvas(Modifier.size(20.dp).semantics { contentDescription = kind.label }) {
         val yellow = Color(0xFFFFD65A); val red = Color(0xFFFF7979)
         if (kind == CardKind.SECOND_YELLOW) {
@@ -101,6 +107,6 @@ import pl.stasgroch.footballhub.data.model.*
         }
         val assists = own.count { it.assistPlayerId == playerId }
         if (assists > 0) { AssistSymbol(); if (assists > 1) Text(assists.toString(), style = MaterialTheme.typography.labelSmall) }
-        own.lastOrNull { it.kind == EventKind.CARD && it.playerId == playerId }?.cardKind?.let { CardSymbol(it) }
+        own.lastOrNull { it.kind == EventKind.CARD && it.playerId == playerId }?.let { CardSymbol(it.cardKind) }
     }
 }

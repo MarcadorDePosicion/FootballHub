@@ -27,7 +27,7 @@ object DemoData {
             Match(4,1,3,4,today.minusDays(1).toString(),"20:00","FINISHED",3,1,9),
             Match(5,2,7,8,today.minusDays(1).toString(),"19:00","FINISHED",1,1,9),
             Match(6,3,11,12,today.plusDays(1).toString(),"20:30","SCHEDULED",null,null,12)
-        )
+        ).map { match -> match.copy(venue = teams.find { it.id == match.homeId }?.stadium) }
         val standings = teams.map {
             val rank = (it.id - 1) % 4
             Standing(it.leagueId, it.id, 8, 6-rank, 1, 1+rank, 19-rank*3, 6+rank*2)
