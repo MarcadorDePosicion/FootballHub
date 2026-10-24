@@ -22,12 +22,13 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavBackStackEntry
 import androidx.compose.ui.platform.testTag
 import pl.stasgroch.footballhub.ui.FootballViewModel
+import pl.stasgroch.footballhub.ui.FootballErrorKind
 import pl.stasgroch.footballhub.ui.screens.*
 import pl.stasgroch.footballhub.ui.theme.HubSpace
 import pl.stasgroch.footballhub.ui.theme.hubHeaderGradient
 
 @OptIn(ExperimentalMaterial3Api::class)
-@Composable fun FootballApp(vm: FootballViewModel = viewModel()) {
+@Composable fun FootballApp(vm: FootballViewModel = viewModel(factory = FootballViewModel.Factory)) {
     val focusManager = LocalFocusManager.current
     val state by vm.state.collectAsStateWithLifecycle()
     val entries by vm.entries.collectAsStateWithLifecycle()
@@ -115,7 +116,7 @@ import pl.stasgroch.footballhub.ui.theme.hubHeaderGradient
             if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
             state.error?.let { message ->
                 Surface(color = MaterialTheme.colorScheme.errorContainer, shape = MaterialTheme.shapes.medium, modifier = Modifier.padding(HubSpace.md)) {
-                    Column(Modifier.padding(HubSpace.md)) { Text(message, style = MaterialTheme.typography.bodyMedium); TextButton(vm::refresh) { Text("Spróbuj ponownie") } }
+                    Column(Modifier.padding(HubSpace.md)) { Text(message.message, style = MaterialTheme.typography.bodyMedium); if (message.kind == FootballErrorKind.REFRESH) TextButton(vm::refresh) { Text("Spróbuj ponownie") } }
                 }
             }
             if (!userDataReady || (state.loading && state.data.matches.isEmpty())) {
@@ -130,7 +131,7 @@ import pl.stasgroch.footballhub.ui.theme.hubHeaderGradient
                 screen("league/{id}") { StandingsScreen(it.arguments?.getString("id")?.toIntOrNull() ?: -1, data, favorites, openMatch = { id -> nav.navigate("match/$id") }, back = { nav.popBackStack() }) { id -> nav.navigate("team/$id") } }
                 screen("team/{id}?player={player}") {
                     TeamScreen(it.arguments?.getString("id")?.toIntOrNull() ?: -1, data, { id -> nav.navigate("match/$id") }, openTeam = { id -> nav.navigate("team/$id") { launchSingleTop = true } }, back = { nav.popBackStack() }, openLeague = { id -> nav.navigate("league/$id") }, highlightedPlayerId = it.arguments?.getString("player")?.toIntOrNull(), openPlayer = { id -> nav.navigate("player/$id") }) { team ->
-                        IconToggleButton(checked = team.id in favorites, onCheckedChange = { vm.favorite(team.id, it) }, enabled = !saving) {
+                        IconToggleButton(checked = team.id in favorites, onCheckedChange = { vm.favorite(team.id, it) }) {
                             Icon(if (team.id in favorites) HubIcons.StarFilled else HubIcons.Star,
                                 if (team.id in favorites) "Usuń z ulubionych" else "Dodaj do ulubionych",
                                 tint = if (team.id in favorites) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
@@ -153,7 +154,7 @@ import pl.stasgroch.footballhub.ui.theme.hubHeaderGradient
                     PlayerScreen(it.arguments?.getString("id")?.toIntOrNull() ?: -1, data,
                         openMatch = { id -> nav.navigate("match/$id") }, openTeam = { id -> nav.navigate("team/$id") }, back = { nav.popBackStack() }, favorite = {
                             val playerId = it.arguments?.getString("id")?.toIntOrNull() ?: -1
-                            IconToggleButton(playerId in favoritePlayers, { vm.favoritePlayer(playerId, it) }, enabled = !saving) {
+                            IconToggleButton(playerId in favoritePlayers, { vm.favoritePlayer(playerId, it) }) {
                                 Icon(if (playerId in favoritePlayers) HubIcons.StarFilled else HubIcons.Star,
                                     if (playerId in favoritePlayers) "Usuń zawodnika z ulubionych" else "Dodaj zawodnika do ulubionych",
                                     tint = if (playerId in favoritePlayers) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
