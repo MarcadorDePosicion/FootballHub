@@ -37,3 +37,18 @@ def application(settings):
 def client(application):
     with TestClient(application) as instance:
         yield instance
+
+
+@pytest.fixture
+def accounts(client, application, settings):
+    from app.auth import create_access_token
+    from app.models import User
+
+    result = []
+    with application.state.database.SessionLocal() as db:
+        for email in ("a@example.com", "b@example.com"):
+            user = User(email=email, password_hash="unused-in-token-tests")
+            db.add(user)
+            db.commit()
+            result.append((user.id, {"Authorization": f"Bearer {create_access_token(user.id, settings)}"}))
+    return result

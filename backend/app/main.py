@@ -10,6 +10,8 @@ from .config import Settings
 from .database import Base, Database, get_db
 from . import models  # Register tables before lifespan calls create_all.
 from .routers.auth import router as auth_router
+from .routers.entries import router as entries_router
+from .routers.favorites import router as favorites_router
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -28,6 +30,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     application = FastAPI(title="Football Hub API", lifespan=lifespan)
     application.include_router(auth_router)
+    application.include_router(entries_router)
+    application.include_router(favorites_router)
 
     @application.get("/api/health", responses={503: {"description": "Database unavailable"}})
     def health(db: Session = Depends(get_db)):
