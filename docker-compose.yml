@@ -1,0 +1,46 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-footballhub}
+      POSTGRES_USER: ${POSTGRES_USER:-footballhub}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-development-only-db-password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  backend:
+    build: ./backend
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
+    environment:
+      ENV: ${ENV:-development}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-footballhub}:${POSTGRES_PASSWORD:-development-only-db-password}@db:5432/${POSTGRES_DB:-footballhub}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-development-only-change-me}
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      JWT_ACCESS_TOKEN_EXPIRE_MINUTES: ${JWT_ACCESS_TOKEN_EXPIRE_MINUTES:-60}
+      FOOTBALL_DATA_MODE: ${FOOTBALL_DATA_MODE:-demo}
+      FOOTBALL_DATA_API_KEY: ${FOOTBALL_DATA_API_KEY:-}
+      FOOTBALL_DATA_BASE_URL: ${FOOTBALL_DATA_BASE_URL:-https://api.football-data.org/v4}
+      FOOTBALL_DATA_COMPETITIONS: ${FOOTBALL_DATA_COMPETITIONS:-PL}
+      FOOTBALL_DATA_CACHE_TTL_SECONDS: ${FOOTBALL_DATA_CACHE_TTL_SECONDS:-120}
+      FOOTBALL_DATA_MAX_REQUESTS_PER_MINUTE: ${FOOTBALL_DATA_MAX_REQUESTS_PER_MINUTE:-10}
+      FOOTBALL_DATA_DAYS_BACK: ${FOOTBALL_DATA_DAYS_BACK:-1}
+      FOOTBALL_DATA_DAYS_FORWARD: ${FOOTBALL_DATA_DAYS_FORWARD:-1}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+volumes:
+  postgres_data:
