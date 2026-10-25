@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from datetime import date
+import time
 
 from fastapi import Depends, FastAPI
 from fastapi.responses import JSONResponse
@@ -14,9 +15,11 @@ from .routers.auth import router as auth_router
 from .routers.entries import router as entries_router
 from .routers.favorites import router as favorites_router
 from .routers.football import router as football_router
+from .football_service import LiveFootballService
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None, *, football_transport=None,
+               football_clock=time.monotonic, football_today=None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(application: FastAPI):
         # No settings, .env reads or database side effects at import time.
@@ -25,10 +28,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         application.state.settings = configuration
         application.state.database = database
         application.state.football_demo_date = date.today()
+        service = None
+        if configuration.football_data_mode == "live" and configuration.football_data_api_key.get_secret_value().strip():
+            service = LiveFootballService(configuration, transport=football_transport,
+                                          clock=football_clock, today=football_today)
+        application.state.football_service = service
         try:
             Base.metadata.create_all(bind=database.engine)
             yield
         finally:
+            if service is not None:
+                await service.close()
             database.engine.dispose()
 
     application = FastAPI(title="Football Hub API", lifespan=lifespan)

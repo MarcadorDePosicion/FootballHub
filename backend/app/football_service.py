@@ -4,11 +4,47 @@ The caller supplies the reference date. Dates remain relative like Android's
 LocalDate.now(), without changing the package midway through a server run.
 """
 from datetime import date, timedelta
+from datetime import datetime
+import asyncio
+import time
+from zoneinfo import ZoneInfo
+
+from .football_client import FootballClient, FootballError
+from .football_mapper import map_football
 
 from .football_schemas import (
     Coach, FootballData, League, Match, MatchEvent, MatchEvents, MatchLineup,
     MatchMinute, Player, PlayerAppearance, Standing, Team,
 )
+
+
+class LiveFootballService:
+    def __init__(self, settings, *, transport=None, clock=time.monotonic, today=None, client=None):
+        self.client = FootballClient(settings, transport=transport, client=client, clock=clock)
+        self.clock = clock
+        self.today = today or (lambda: datetime.now(ZoneInfo("Europe/Warsaw")).date())
+        self.ttl = settings.football_data_cache_ttl_seconds
+        self.cached = None
+        self.expires = 0.0
+        self.lock = asyncio.Lock()
+
+    async def get(self):
+        async with self.lock:
+            if self.cached is not None and self.clock() < self.expires:
+                return self.cached.model_copy(deep=True), "hit"
+            try:
+                package = map_football(await self.client.fetch(self.today()))
+            except FootballError as error:
+                # Access/validation errors are explicit even with cache; keep last good data intact.
+                if error.transient and self.cached is not None:
+                    return self.cached.model_copy(deep=True), "stale"
+                raise
+            self.cached = package
+            self.expires = self.clock() + self.ttl
+            return package.model_copy(deep=True), "miss"
+
+    async def close(self):
+        await self.client.close()
 
 
 def demo_events() -> list[MatchEvents]:

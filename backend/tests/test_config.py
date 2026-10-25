@@ -96,3 +96,41 @@ with TestClient(create_app(settings)) as client:
                             capture_output=True, text=True, timeout=30)
     assert result.returncode == 0, result.stderr
     assert not list(tmp_path.glob("*.db"))
+
+
+@pytest.mark.parametrize("key", ["", "  "])
+def test_live_requires_nonblank_key(key):
+    with pytest.raises(ValidationError, match="Live football requires"):
+        Settings(_env_file=None, football_data_mode="live", football_data_api_key=key)
+
+
+def test_live_configuration_and_csv(monkeypatch):
+    import secrets
+    monkeypatch.setenv("FOOTBALL_DATA_COMPETITIONS", " pl, PD,SA,BL1,PL ")
+    monkeypatch.setenv("FOOTBALL_DATA_BASE_URL", "https://api.football-data.org//v4///")
+    settings = Settings(_env_file=None, football_data_api_key=secrets.token_hex(16))
+    assert settings.football_data_mode == "demo"
+    assert settings.football_data_competitions == "PL,PD,SA,BL1"
+    assert settings.football_data_base_url == "https://api.football-data.org/v4"
+    assert settings.football_data_cache_ttl_seconds == 120
+    assert settings.football_data_max_requests_per_minute == 10
+    assert settings.football_data_days_back == settings.football_data_days_forward == 1
+
+
+@pytest.mark.parametrize("value", ["", " ", "PL,", "PL,,PD", "../teams"])
+def test_invalid_competitions(value):
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None, football_data_competitions=value)
+
+
+@pytest.mark.parametrize("name,value", [
+    ("football_data_cache_ttl_seconds", 0), ("football_data_cache_ttl_seconds", -1),
+    ("football_data_max_requests_per_minute", 0), ("football_data_max_requests_per_minute", -1),
+    ("football_data_days_back", -1), ("football_data_days_forward", 366),
+    ("football_data_base_url", "http://example.com/v4"),
+    ("football_data_base_url", "https://user:password@example.com/v4"),
+    ("football_data_base_url", "https://example.com/v4?token=value"),
+])
+def test_invalid_live_settings(name, value):
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None, **{name: value})

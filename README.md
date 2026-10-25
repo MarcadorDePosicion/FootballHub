@@ -2,7 +2,7 @@
 
 Football Hub to aplikacja Android przygotowana jako projekt studencki z przedmiotu **Technologie Usługowe i Mobilne**. Umożliwia przeglądanie demonstracyjnych meczów, tabel, składów i wydarzeń meczowych, wyszukiwanie drużyn i zawodników oraz prowadzenie lokalnego dziennika notatek i typów wyników.
 
-**Dane piłkarskie są przykładowe i pochodzą z lokalnego mocka. Aplikacja nie pobiera wyników na żywo.** Nie wymaga konta, klucza API ani uruchomienia backendu.
+**Android nadal korzysta z lokalnego demo i nie jest połączony z backendem.** Nie wymaga konta, klucza API ani uruchomienia serwera. Osobny backend FastAPI w `backend/` obsługuje już konta/JWT, dziennik, ulubione i dane piłkarskie w trybach `demo` oraz `live`. Integrację z dostawcą sprawdzono na odpowiedziach testowych, bez rzeczywistych połączeń do football-data.org.
 
 ## Funkcje
 
@@ -16,7 +16,7 @@ Football Hub to aplikacja Android przygotowana jako projekt studencki z przedmio
 - **Ulubione** — drużyny i zawodnicy dodawani gwiazdką na profilu, z lokalnym zapisem. Oddzielne kategorie Drużyny i Zawodnicy mają karty pustego stanu. Przy całkowicie pustych ulubionych dostępny jest przycisk przeglądania lig.
 - **Moje** — tworzenie, odczyt, edycja i usuwanie notatek oraz typów wyników przypisanych do meczów. Wpisy są grupowane według spotkania i można je filtrować według rodzaju.
 
-Formularze sprawdzają m.in. pustą treść notatki, limit 2000 znaków oraz wyniki w zakresie 0–99. Usunięcie wpisu wymaga potwierdzenia. Zapisane wpisy i ulubione pozostają dostępne po ponownym uruchomieniu aplikacji.
+Formularze sprawdzają m.in. pustą treść notatki, limit 2000 jednostek UTF-16 tekstu wejściowego oraz wyniki w zakresie 0–99. Usunięcie wpisu wymaga potwierdzenia. Zapisane wpisy i ulubione pozostają dostępne po ponownym uruchomieniu aplikacji.
 
 Na karcie zakończonego meczu ukryta jest akcja dodania typu; nadal można dodawać notatki i edytować wcześniej zapisane typy w Moje. To lokalny dziennik przewidywań, bez zawierania zakładów.
 
@@ -34,7 +34,7 @@ Dni w Meczach i zakładki szczegółów można przesuwać poziomo. Ponowne dotkn
 
 ## Technologie i konfiguracja
 
-Projekt zawiera jeden moduł aplikacji: `app`.
+Projekt zawiera moduł Android `app` oraz niezależny backend Python w `backend/`.
 
 | Obszar | Technologia / wersja w konfiguracji |
 | --- | --- |
@@ -113,13 +113,56 @@ Przepływ danych: **Compose → ViewModel → repozytorium → Retrofit/OkHttp l
 
 Notatki i typy mają identyfikatory UUID oraz identyfikator meczu. Baza Room `football-hub.db` w wersji **2** zawiera tabele `entries`, `favorites` i `favorite_players`; ulubione przechowują identyfikatory drużyn lub zawodników. Schematy znajdują się w `app/schemas`. Migracja 1 → 2 dodaje ulubionych zawodników, zachowując wcześniejsze wpisy i drużyny. Baza nie korzysta z destrukcyjnych migracji. Jest lokalna: ponowne uruchomienie nie usuwa danych, natomiast wyczyszczenie danych aplikacji lub odinstalowanie je usuwa.
 
-### Dane demonstracyjne i przyszły backend
+### Dane demonstracyjne Androida i integracja
 
 Retrofit wywołuje `GET /api/football`. `MockFootballInterceptor` przechwytuje żądanie i zwraca lokalną odpowiedź JSON. Nie wywołuje `chain.proceed()`, więc żądanie nie trafia do serwera. Użyty adres w domenie `.example` jest placeholderem i nie wymaga konfiguracji DNS ani klucza API.
 
 Przykładowe dane obejmują Premier League, La Ligę i Ekstraklasę: 12 drużyn, 6 meczów i 168 fikcyjnych zawodników. Nazwy klubów są rzeczywiste, lecz terminarz, wyniki, tabele, kadry i zdarzenia są fikcyjne. Tabele zawierają fragmenty po cztery drużyny; nie są pełnymi tabelami rozgrywek. Część pól zawodników i skład następnego dnia są celowo niedostępne, aby pokazywać obsługę braków. Daty są generowane względem dnia utworzenia danych demonstracyjnych; identyfikatory pozostają stałe, dlatego zapisany wpis nadal odnosi się do tego samego demonstracyjnego meczu, nawet gdy zmieni się jego prezentowana data. Dane piłkarskie są tworzone ponownie przy ładowaniu demo; nie stanowią trwałego archiwum sezonu.
 
-Przyszłe podłączenie REST wymaga zastąpienia konfiguracji `FootballRepository.demo()`: usunięcia mock interceptora, ustawienia adresu backendu i zachowania kontraktu danych lub dodania mapowania DTO. Synchronizacja notatek, typów i ulubionych z serwerem wymaga osobnej implementacji w warstwie `UserRepository`; obecnie jej nie ma.
+Backend jest już zaimplementowany, lecz podłączenie go do Androida nadal wymaga zastąpienia konfiguracji `FootballRepository.demo()`: usunięcia mock interceptora i ustawienia adresu serwera. Synchronizacja notatek, typów i ulubionych wymaga osobnej implementacji w warstwie `UserRepository`; obecnie jej nie ma. Fabryka ViewModelu nadal wstrzykuje lokalne demo i repozytorium Room. Brak powiązanego obiektu w aktualnym pakiecie nie usuwa zapisów użytkownika.
+
+## Backend FastAPI
+
+Serwer używa Python 3.13 (sprawdzone środowisko: 3.13.17), FastAPI, Uvicorn, Pydantic v2, SQLAlchemy 2, HTTPX, PyJWT i bcrypt. SQLite jest domyślną bazą lokalną; PostgreSQL obsługuje sterownik psycopg. Zależności produkcyjne znajdują się w `backend/requirements.txt`, a testowe (pytest i httpx2 dla klienta testowego) w `backend/requirements-dev.txt`.
+
+| Endpoint | Działanie |
+| --- | --- |
+| `GET /api/health` | Sprawdza bazę przez `SELECT 1`; zwraca 200 lub kontrolowany 503 |
+| `POST /api/auth/register`, `POST /api/auth/login` | Rejestracja i logowanie; hashowane hasła i token JWT |
+| `GET /api/auth/me` | Dane zalogowanego użytkownika |
+| `GET /api/entries`, `PUT/DELETE /api/entries/{id}` | Odczyt, zapis i usuwanie własnych wpisów |
+| `GET /api/favorites`, `PUT/DELETE /api/favorites/teams/{id}`, `PUT/DELETE /api/favorites/players/{id}` | Własne ulubione drużyny i zawodnicy |
+| `GET /api/football` | Publiczny pakiet danych piłkarskich, bez logowania |
+
+Dziennik i ulubione wymagają JWT i są ograniczone do bieżącego użytkownika. Walidacja wpisu sprawdza limit 2000 jednostek UTF-16 przed przycięciem tekstu, zachowując komentarz przy predykcji. Baza serwera jest niezależna od Room. Tabele tworzy `create_all`; nie ma jeszcze systemu migracji backendu.
+
+API piłkarskie zwraca bez wrappera osiem list: `leagues`, `teams`, `players`, `standings`, `matches`, `lineups`, `matchEvents`, `appearances`. Kontrakt camelCase odpowiada modelom Kotlin/Gson, w tym `position`, `officialPoints`, opcjonalnemu `venue`, zdarzeniu `SECOND_YELLOW` i kompletności `coverage` (`UNAVAILABLE`, `PARTIAL`, `COMPLETE`).
+
+- **Demo (domyślnie):** dane przeniesione z Androida ze stałymi ID i relacjami; daty względem dnia uruchomienia serwera. Nie wymaga klucza ani połączenia z dostawcą.
+- **Live:** klient football-data.org v4 pobiera drużyny, mecze i tabele. Mapper zachowuje ID dostawcy i oficjalne punkty. Cache w pamięci ma domyślnie TTL 120 s; wybrane błędy przejściowe pozwalają zwrócić poprzedni pakiet. Nie ma automatycznych ponowień HTTP 429 ani przełączania na demo.
+- **Limit:** domyślnie 10 żądań na 60 s, wspólnie dla rozgrywek w jednej instancji. Limiter odrzuca nadmiarowe żądanie, zamiast czekać. Cztery ligi wymagające 12 żądań nie zakończą pełnego pobrania przy limicie 10. Cache i limit nie są współdzielone między procesami.
+
+Konfigurację, błędy i ograniczenia mapowania opisuje [dokumentacja źródła live](backend/FOOTBALL_LIVE.md). Nie potwierdzono dostępności danych w rzeczywistym planie dostawcy. ID demo i live nie należy automatycznie utożsamiać przy przyszłej integracji danych użytkownika.
+
+### Uruchomienie serwera lokalnie
+
+Wymagany jest Python 3.13. Z katalogu głównego repozytorium (istniejącego środowiska nie trzeba tworzyć ponownie):
+
+```powershell
+py -3.13 -m venv backend\.venv
+.\backend\.venv\Scripts\python.exe -m pip install -r backend\requirements-dev.txt
+```
+
+Jeśli launcher `py` jest niedostępny, użyj pełnej ścieżki do interpretera Python 3.13. Opcjonalny `backend/.env` przygotuj na podstawie `backend/.env.example`, bez nadpisywania istniejącego pliku. Domyślne SQLite i demo nie wymagają klucza dostawcy. Tryb `live` wymaga jawnego `FOOTBALL_DATA_MODE=live` i własnego `FOOTBALL_DATA_API_KEY`. `ENV=production` odrzuca domyślny sekret JWT. Nie dodawaj `.env` do Git.
+
+Uruchom serwer **z katalogu `backend/`**, aby względna ścieżka SQLite z przykładowej konfiguracji wskazywała ten katalog:
+
+```powershell
+cd backend
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload
+```
+
+API jest dostępne pod `http://127.0.0.1:8000`, dokumentacja interaktywna pod `/docs`, a test dostępności pod `/api/health`. `--reload` służy do lokalnego rozwoju.
 
 ## Testy i weryfikacja
 
@@ -138,6 +181,9 @@ Na macOS i Linux zastąp `.\gradlew.bat` poleceniem `sh gradlew`. Testy jednostk
 | Zestaw | Zakres |
 | --- | --- |
 | `FootballDataTest` | JSON interceptora, spójność danych i walidacja formularzy |
+| `FootballViewModelTest` | Ładowanie, walidacja, współbieżność ulubionych i kolejność błędów |
+| `FootballErrorUiTest`, `MissingReferencesTest` | Akcje komunikatów błędów i brakujące referencje |
+| `DomainSemanticsTest`, `DomainSemanticsUiTest` | Semantyka statusów, braków danych i prezentacji |
 | `NavigationScrollStateTest` | Stan i próg zmiany wariantu dolnej nawigacji |
 | `PlayerEventsTest`, `PlayedMinutesTest` | Spójność zdarzeń, powiązania z zawodnikami i wyliczanie minut gry |
 | `RoomPersistenceTest` | Operacje CRUD, odtworzenie danych i migracja schematu 1 → 2 |
@@ -150,34 +196,51 @@ Repozytorium zawiera także podstawowe testy z szablonu Android Studio. Testy UI
 
 Raporty są generowane w `app/build/reports/`, m.in. `tests/testDebugUnitTest/`, `androidTests/connected/debug/` oraz `lint-results-debug.html`. Wybrane testy UI zapisują zrzuty na urządzeniu w `/sdcard/Download/footballhub-ui`. Raporty i zrzuty są wynikami lokalnego uruchomienia, a nie warunkiem pobrania projektu.
 
-### Ostatni udokumentowany wynik — 23.10.2026
+### Testy backendu
 
-Po poprawce zachowania wyszukiwarki wykonano kompilację, testy i lint:
+Z katalogu głównego repozytorium:
 
-- `assembleDebug`, `testDebugUnitTest`, `connectedDebugAndroidTest` i `lintDebug`: **BUILD SUCCESSFUL**;
-- **11 testów JVM i 27 testów Android**, bez błędów i pominięć;
-- emulator Pixel 8 z Androidem 16 — środowisko weryfikacji, nie wymaganie aplikacji;
-- lint: **0 błędów, 22 ostrzeżenia** dotyczące nowszych zależności, nieużywanych zasobów szablonu i nadmiarowej etykiety manifestu;
-- oględziny zapisanych klatek przejścia Ligi ↔ liga oraz testy geometrii i ciemnego tła w trakcie wybranych przejść.
+```powershell
+.\backend\.venv\Scripts\python.exe -m pytest -c backend\pytest.ini -v
+.\backend\.venv\Scripts\python.exe -m pip check
+```
 
-README zaktualizowano po zakończeniu implementacji i testów. Wyniki nie potwierdzają działania na każdym urządzeniu ani poprawności każdej klatki wszystkich tras. Nie wykonano benchmarku czasu klatek, pomiaru rekompozycji ani testów wydajności na fizycznym telefonie. Szczegółowy zakres oraz odtworzony przed poprawką błąd wyszukiwarki opisuje [raport audytu](docs/animation-audit-2026-10-23.md).
+Testy obejmują konfigurację, health check, konta/JWT, izolację danych użytkowników, dziennik, ulubione, kontrakt demo oraz klienta live, mapper, cache i limiter. Korzystają z izolowanej bazy SQLite i kontrolowanych odpowiedzi HTTP, bez lokalnego `.env` i rzeczywistych zapytań do dostawcy.
 
-### Krótki scenariusz demonstracji
+Ostatnia wykonana weryfikacja backendu (25.10.2026): **221 testów zaliczonych**, bez niezaliczonych i pominiętych; `pip check` bez konfliktów. To wynik wcześniejszego uruchomienia, nie ponownego testu przy aktualizacji README. Nie potwierdza działania z rzeczywistym PostgreSQL ani kontem football-data.org.
 
-1. Pokaż Start i oznaczenie danych demonstracyjnych; otwórz szczegóły meczu oraz profil drużyny.
-2. W Meczach zmień dzień, ligę, stan i kolejność. Sprawdź również dzień bez spotkań.
-3. Wyszukaj drużynę i zawodnika, użyj filtrów, otwórz profile i wróć do zapytania. Sprawdź zamknięcie wyników i klawiatury po dotknięciu poza polem.
-4. Przełącz zakładki ligi, drużyny, zawodnika i meczu. Obejrzyj zdarzenia, boisko, obie ławki i historię występów; sprawdź wyróżnienia w tabeli oraz zwijanie nagłówka i dolnej nawigacji.
-5. Dodaj drużynę i zawodnika do Ulubionych; przełącz kategorie, usuń elementy gwiazdką i sprawdź puste stany.
-6. Dodaj notatkę i typ do jednego meczu, sprawdź wspólny nagłówek w Moje, edycję, walidację oraz anulowanie i potwierdzenie usunięcia.
-7. Obróć ekran podczas edycji, a następnie zamknij i uruchom aplikację ponownie, aby sprawdzić trwałość zapisanych danych. Sprawdź też działanie mocka bez sieci.
+Historyczny audyt Androida z 23.10.2026 odnotował 11 testów JVM, 27 testów urządzeniowych oraz poprawną kompilację i lint (0 błędów, 22 ostrzeżenia przed porządkowaniem zasobów). Od tego czasu kod i zestaw testów rozszerzono; nie są to aktualne liczby dla obecnego Androida. Zakres pomiarów animacji opisuje [raport audytu](docs/animation-audit-2026-10-23.md).
 
-Przed nagraniem warto ocenić płynność animacji, długie nazwy, większą czcionkę i dostępność ostatnich elementów list nad pływającym paskiem. **Nie używaj czyszczenia danych aplikacji ani odinstalowania do sprawdzania trwałości** — te operacje usuwają lokalną bazę.
+## Historia wersji i etapów
+
+Daty i identyfikatory pochodzą z historii Git. Są to kolejne stany projektu, bez nadawania nieistniejących numerów wydań.
+
+| Data | Wersja / etap | Zwięzły zakres |
+| --- | --- | --- |
+| 21.10.2026 | `d5aad61` | Bazowa wersja mobilnego Football Hub |
+| 21.10.2026 | `28ca18e` | Fokus wyszukiwarki i poprawki ekranów meczów |
+| 22.10.2026 | `3699317` | Składy, kadry i wyszukiwanie zawodników |
+| 22.10.2026 | `fd49374` | Profile zawodników i zdarzenia meczowe |
+| 23.10.2026 | `526f064` | Rozbudowa profili i szczegółów spotkania |
+| 23.10.2026 | `45d3b75` | Układ boiska i statystyki występów |
+| 23.10.2026 | `b97097f` | Przełączanie składów i karty rezerwowych |
+| 23.10.2026 | `29b646d` | Przejścia między ekranami i wygląd Ulubionych |
+| 23.10.2026 | `6a4712e` | Usunięcie zbędnej etykiety i nieużywanych kolorów |
+| 24.10.2026 | 1A — `c412a74` | Zależności, stan i współbieżność ViewModelu |
+| 24.10.2026 | 1B — `522f048` | Bezpieczne referencje przy niepełnych danych |
+| 24.10.2026 | 1C — `bd149e6` | Modele i prezentacja przygotowane na dane zewnętrzne |
+| 24.10.2026 | 2A — `4606395` | Szkielet FastAPI, baza i health check |
+| 24.10.2026 | 2A.1 — `6045ebb` | Środowisko Python 3.13 i klient testowy |
+| 24.10.2026 | 2B — `b7d06c2` | Konta użytkowników i autoryzacja JWT |
+| 25.10.2026 | 2C — `243d76d` | Dziennik i ulubione przypisane do użytkownika |
+| 25.10.2026 | 2D.1 — `c5ed857` | Kontrakt `/api/football` i spójne demo backendu |
+| 25.10.2026 | 2D.2 — zmiany niezatwierdzone w Git | Klient v4, mapper, cache, limiter i testy przypadków granicznych |
 
 ## Ograniczenia
 
-- Brak prawdziwego backendu, wyników na żywo, logowania i synchronizacji między urządzeniami.
-- Dane piłkarskie mają wyłącznie charakter demonstracyjny; puste dni oraz niepełne tabele są oczekiwane dla tego zestawu danych.
+- Android nie ma jeszcze integracji z backendem, logowania ani synchronizacji między urządzeniami. Serwer udostępnia konta i dane niezależnie od aplikacji mobilnej.
+- Backend nie ma jeszcze Dockera, migracji schematu ani współdzielonego cache/limitera. Tryb live wymaga dalszej weryfikacji z rzeczywistym dostawcą.
+- Dane piłkarskie wyświetlane obecnie w Androidzie mają charakter demonstracyjny; puste dni oraz niepełne tabele są oczekiwane dla tego zestawu danych.
 - Notatki, typy i ulubione są zapisywane lokalnie. Wyczyszczenie danych lub odinstalowanie aplikacji powoduje ich utratę.
 - Emblematy klubów są lekkimi oznaczeniami z inicjałami, a nie oficjalnymi herbami.
 - Projekt nie obejmuje reklam, kursów bukmacherskich, zakładów, czatu, fantasy football ani funkcji płatnych.
