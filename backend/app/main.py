@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+from datetime import date
 
 from fastapi import Depends, FastAPI
 from fastapi.responses import JSONResponse
@@ -12,6 +13,7 @@ from . import models  # Register tables before lifespan calls create_all.
 from .routers.auth import router as auth_router
 from .routers.entries import router as entries_router
 from .routers.favorites import router as favorites_router
+from .routers.football import router as football_router
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -22,6 +24,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         database = Database(configuration.database_url)
         application.state.settings = configuration
         application.state.database = database
+        application.state.football_demo_date = date.today()
         try:
             Base.metadata.create_all(bind=database.engine)
             yield
@@ -32,6 +35,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.include_router(auth_router)
     application.include_router(entries_router)
     application.include_router(favorites_router)
+    application.include_router(football_router)
 
     @application.get("/api/health", responses={503: {"description": "Database unavailable"}})
     def health(db: Session = Depends(get_db)):
